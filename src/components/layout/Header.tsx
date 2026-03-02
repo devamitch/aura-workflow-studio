@@ -1,5 +1,7 @@
 import React, { useRef, useState } from "react";
 import {
+  ChevronDown,
+  Crown,
   Download,
   FilePlus,
   FolderOpen,
@@ -12,24 +14,39 @@ import {
   Sparkles,
   Sun,
   Upload,
-  Crown,
-  ChevronDown,
+  Zap,
 } from "lucide-react";
 import { useStore } from "../../store";
 import { WorkflowsModal } from "../sidebar/WorkflowsModal";
+import { PricingModal } from "../ui/PricingModal";
 
 export const Header: React.FC = () => {
   const [showWorkflowsModal, setShowWorkflowsModal] = useState(false);
+  const [showPricingModal, setShowPricingModal] = useState(false);
+  const [pricingTab, setPricingTab] = useState<"plans" | "credits">("plans");
   const [savePrompt, setSavePrompt] = useState(false);
   const [saveName, setSaveName] = useState("");
   const [showUserMenu, setShowUserMenu] = useState(false);
   const saveInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { theme, toggleTheme, user, signOut, clearCanvas, loadDemo, saveWorkflow, exportToJSON, importFromJSON, applyAutoLayout } = useStore();
+  const {
+    theme, toggleTheme, user, signOut,
+    clearCanvas, loadDemo, saveWorkflow,
+    exportToJSON, importFromJSON, applyAutoLayout,
+  } = useStore();
 
   const nodes = useStore((s) => s.nodes);
   const edges = useStore((s) => s.edges);
+  const plan = useStore((s) => s.plan);
+
+  const creditsLeft = plan.tier === "free"
+    ? Math.max(0, (plan.creditsTotal + plan.creditsExtra) - plan.creditsUsed)
+    : null;
+
+  const creditsPercent = plan.tier === "free"
+    ? ((plan.creditsUsed / plan.creditsTotal) * 100)
+    : 0;
 
   const handleSaveConfirm = () => {
     saveWorkflow(saveName.trim() || "Untitled");
@@ -43,7 +60,7 @@ export const Header: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `aura-workflow-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `auraflow-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -71,7 +88,7 @@ export const Header: React.FC = () => {
             <Sparkles size={16} />
           </div>
           <span className="header-logo-text">
-            Aura<span>AI</span>
+            Aura<span>Flow</span>
           </span>
           <span className="header-badge">BETA</span>
         </div>
@@ -97,12 +114,8 @@ export const Header: React.FC = () => {
                   if (e.key === "Escape") { setSavePrompt(false); setSaveName(""); }
                 }}
               />
-              <button className="header-btn header-btn-primary" onClick={handleSaveConfirm}>
-                Save
-              </button>
-              <button className="header-btn" onClick={() => { setSavePrompt(false); setSaveName(""); }}>
-                ✕
-              </button>
+              <button className="header-btn header-btn-primary" onClick={handleSaveConfirm}>Save</button>
+              <button className="header-btn" onClick={() => { setSavePrompt(false); setSaveName(""); }}>✕</button>
             </div>
           ) : (
             <button
@@ -115,13 +128,11 @@ export const Header: React.FC = () => {
             </button>
           )}
 
-          <button className="header-btn" onClick={() => setShowWorkflowsModal(true)} title="Open Workflows">
+          <button className="header-btn" onClick={() => setShowWorkflowsModal(true)} title="Open">
             <FolderOpen size={14} />
             <span>Open</span>
           </button>
-
           <div className="header-divider" />
-
           <button className="header-btn" onClick={loadDemo} title="Load Demo">
             <PlayCircle size={14} />
             <span>Demo</span>
@@ -140,30 +151,65 @@ export const Header: React.FC = () => {
           </button>
         </div>
 
-        {/* Right: Stats + theme + user */}
+        {/* Right */}
         <div className="header-right">
+          {/* Node/edge count */}
           <div className="header-stats">
             <span className="header-stat-chip">{nodes.length} nodes</span>
             <span className="header-stat-chip">{edges.length} edges</span>
           </div>
 
+          {/* Credits bar (free plan only) */}
+          {plan.tier === "free" && creditsLeft !== null && (
+            <button
+              className={`header-credits-bar${creditsLeft === 0 ? " depleted" : ""}`}
+              onClick={() => { setPricingTab("credits"); setShowPricingModal(true); }}
+              title="Buy more credits"
+            >
+              <Zap size={11} />
+              <span>{creditsLeft} / {plan.creditsTotal} credits</span>
+              <div className="header-credits-track">
+                <div
+                  className="header-credits-fill"
+                  style={{ width: `${Math.min(100, creditsPercent)}%` }}
+                />
+              </div>
+            </button>
+          )}
+
+          {/* Plan badge (paid plans) */}
+          {plan.tier !== "free" && (
+            <div className={`header-plan-pill ${plan.tier}`}>
+              <Crown size={11} />
+              <span>{plan.tier === "annual" ? "Annual" : "Pro"}</span>
+            </div>
+          )}
+
           <button className="header-icon-btn" onClick={toggleTheme} title="Toggle theme">
             {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
           </button>
 
+          {/* Upgrade button */}
+          <button
+            className="header-upgrade-btn"
+            onClick={() => { setPricingTab("plans"); setShowPricingModal(true); }}
+            title="Upgrade Plan"
+          >
+            <Crown size={13} />
+            <span>{plan.tier === "free" ? "Upgrade" : "Plans"}</span>
+          </button>
+
+          {/* User menu */}
           {user && (
             <div className="header-user-menu" onBlur={() => setTimeout(() => setShowUserMenu(false), 150)}>
-              <button
-                className="header-user-btn"
-                onClick={() => setShowUserMenu((v) => !v)}
-              >
+              <button className="header-user-btn" onClick={() => setShowUserMenu((v) => !v)}>
                 {user.avatar_url ? (
                   <img src={user.avatar_url} alt={displayName} className="header-avatar" />
                 ) : (
                   <div className="header-avatar-fallback">{displayName[0].toUpperCase()}</div>
                 )}
                 <span className="header-user-name">{displayName}</span>
-                {user.is_premium && <Crown size={12} className="header-premium-crown" />}
+                {plan.tier !== "free" && <Crown size={11} className="header-premium-crown" />}
                 <ChevronDown size={12} />
               </button>
 
@@ -171,21 +217,21 @@ export const Header: React.FC = () => {
                 <div className="header-dropdown">
                   <div className="header-dropdown-user">
                     <div className="header-dropdown-email">{user.email}</div>
-                    {user.is_premium ? (
-                      <span className="header-plan-badge premium">Premium</span>
-                    ) : (
-                      <span className="header-plan-badge free">Free Plan</span>
-                    )}
+                    <span className={`header-plan-badge ${plan.tier}`}>
+                      {plan.tier === "free" ? "Free Plan" : plan.tier === "pro" ? "Pro" : "Annual"}
+                    </span>
                   </div>
                   <div className="header-dropdown-divider" />
+                  <button className="header-dropdown-item"
+                    onClick={() => { setShowUserMenu(false); setShowPricingModal(true); }}>
+                    <Crown size={13} />
+                    Upgrade Plan
+                  </button>
                   <button className="header-dropdown-item">
                     <Settings size={13} />
                     Settings
                   </button>
-                  <button
-                    className="header-dropdown-item danger"
-                    onClick={() => void signOut()}
-                  >
+                  <button className="header-dropdown-item danger" onClick={() => void signOut()}>
                     <LogOut size={13} />
                     Sign out
                   </button>
@@ -196,16 +242,12 @@ export const Header: React.FC = () => {
         </div>
       </header>
 
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".json,application/json"
-        style={{ display: "none" }}
-        onChange={handleImport}
-      />
+      <input ref={fileInputRef} type="file" accept=".json,application/json"
+        style={{ display: "none" }} onChange={handleImport} />
 
-      {showWorkflowsModal && (
-        <WorkflowsModal onClose={() => setShowWorkflowsModal(false)} />
+      {showWorkflowsModal && <WorkflowsModal onClose={() => setShowWorkflowsModal(false)} />}
+      {showPricingModal && (
+        <PricingModal defaultTab={pricingTab} onClose={() => setShowPricingModal(false)} />
       )}
     </>
   );

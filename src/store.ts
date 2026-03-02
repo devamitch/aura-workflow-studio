@@ -9,8 +9,14 @@ import {
 } from "reactflow";
 import { create } from "zustand";
 import type { HandleConfig, PipelineEdge, PipelineNode } from "./types";
-import type { Session } from "@supabase/supabase-js";
-import { isSupabaseConfigured, supabase } from "./lib/supabase";
+import {
+  clearToken,
+  decodeJwtPayload,
+  isGoogleConfigured,
+  loadToken,
+  saveToken,
+  type GooglePayload,
+} from "./lib/google-auth";
 
 // ─── Auth Types ────────────────────────────────────────────────────────────────
 export interface AuthUser {
@@ -111,6 +117,37 @@ function writeSavedWorkflows(list: SavedWorkflow[]): void {
 
 interface NodeIDs { [type: string]: number }
 
+// ─── Plan & Credits ─────────────────────────────────────────────────────────────
+export type PlanTier = "free" | "pro" | "annual";
+
+export interface UserPlan {
+  tier: PlanTier;
+  creditsUsed: number;
+  creditsTotal: number;
+  creditsExtra: number;   // purchased add-on credits
+  renewsAt: string | null;
+}
+
+export const PLAN_LIMITS: Record<PlanTier, { aiGenerations: number; modelAccess: string[] }> = {
+  free:   { aiGenerations: 20,        modelAccess: ["gemini-1.5-flash"] },
+  pro:    { aiGenerations: Infinity,  modelAccess: ["gemini-1.5-flash", "gemini-1.5-pro", "gpt-4o", "gpt-4-turbo", "claude-3-5-sonnet", "claude-3-haiku"] },
+  annual: { aiGenerations: Infinity,  modelAccess: ["gemini-1.5-flash", "gemini-1.5-pro", "gpt-4o", "gpt-4-turbo", "claude-3-5-sonnet", "claude-3-haiku", "claude-3-opus"] },
+};
+
+const PLAN_LS_KEY = "aura_user_plan";
+function loadPlan(): UserPlan {
+  try {
+    const raw = localStorage.getItem(PLAN_LS_KEY);
+    if (raw) return JSON.parse(raw) as UserPlan;
+  } catch {}
+  return { tier: "free", creditsUsed: 0, creditsTotal: 20, creditsExtra: 0, renewsAt: null };
+}
+function savePlan(plan: UserPlan) {
+  try { localStorage.setItem(PLAN_LS_KEY, JSON.stringify(plan)); } catch {}
+}
+
+interface NodeIDs { [type: string]: number }
+
 // ─── Store Interface ───────────────────────────────────────────────────────────
 interface CombinedStore {
   // Auth
@@ -118,8 +155,15 @@ interface CombinedStore {
   token: string | null;
   loading: boolean;
   bootstrapAuth: () => void;
+  signInWithGoogle: (credential: string) => Promise<void>;
   refreshUser: () => Promise<void>;
   signOut: () => Promise<void>;
+
+  // Plan & Credits
+  plan: UserPlan;
+  setPlan: (tier: PlanTier, extraCredits?: number) => void;
+  consumeCredit: () => boolean;  // returns false if out of credits
+  addExtraCredits: (amount: number) => void;
 
   // Theme
   theme: "dark" | "light";
@@ -184,40 +228,93 @@ export const useStore = create<CombinedStore>((set, get) => ({
   // ── Auth ──────────────────────────────────────────────────────────────────
   user: null,
   token: null,
-  loading: isSupabaseConfigured,
+  loading: isGoogleConfigured,
+
+  // ── Plan & Credits ────────────────────────────────────────────────────────
+  plan: loadPlan(),
+
+  setPlan: (tier, extraCredits = 0) => {
+    const total = tier === "free" ? 20 : Infinity;
+    const plan: UserPlan = {
+      tier,
+      creditsUsed: 0,
+      creditsTotal: total,
+      creditsExtra: extraCredits,
+      renewsAt: tier !== "free"
+        ? new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString()
+        : null,
+    };
+    savePlan(plan);
+    set({ plan });
+  },
+
+  consumeCredit: () => {
+    const { plan } = get();
+    if (plan.tier !== "free") return true;  // paid plans: unlimited
+    const available = plan.creditsTotal + plan.creditsExtra - plan.creditsUsed;
+    if (available <= 0) return false;
+    const updated = { ...plan, creditsUsed: plan.creditsUsed + 1 };
+    savePlan(updated);
+    set({ plan: updated });
+    return true;
+  },
+
+  addExtraCredits: (amount: number) => {
+    const { plan } = get();
+    const updated = { ...plan, creditsExtra: plan.creditsExtra + amount };
+    savePlan(updated);
+    set({ plan: updated });
+  },
 
   bootstrapAuth: () => {
-    if (!isSupabaseConfigured) {
-      set({ user: null, token: null, loading: false });
+    if (!isGoogleConfigured) {
+      set({ loading: false });
       return;
     }
+    const stored = loadToken();
+    if (!stored) {
+      set({ loading: false });
+      return;
+    }
+    try {
+      const payload = decodeJwtPayload<GooglePayload>(stored);
+      set({
+        user: {
+          id: 0,
+          email: payload.email,
+          name: payload.name ?? null,
+          avatar_url: payload.picture ?? null,
+          is_admin: false,
+          is_premium: false,
+          has_api_key: false,
+        },
+        token: stored,
+        loading: false,
+      });
+      void get().refreshUser();
+    } catch {
+      clearToken();
+      set({ loading: false });
+    }
+  },
 
-    const applySession = (session: Session | null) => {
-      if (session?.user) {
-        set({
-          user: {
-            id: 0,
-            email: session.user.email || "",
-            name: session.user.user_metadata?.full_name || session.user.email,
-            avatar_url: session.user.user_metadata?.avatar_url,
-            is_admin: false,
-            is_premium: false,
-            has_api_key: false,
-          },
-          token: session.access_token,
-          loading: false,
-        });
-        void get().refreshUser();
-      } else {
-        set({ user: null, token: null, loading: false });
-      }
-    };
-
-    void supabase.auth.getSession()
-      .then(({ data: { session } }) => applySession(session))
-      .catch(() => set({ user: null, token: null, loading: false }));
-
-    supabase.auth.onAuthStateChange((_event, session) => applySession(session));
+  signInWithGoogle: async (credential: string) => {
+    saveToken(credential);
+    const payload = decodeJwtPayload<GooglePayload>(credential);
+    set({
+      user: {
+        id: 0,
+        email: payload.email,
+        name: payload.name ?? null,
+        avatar_url: payload.picture ?? null,
+        is_admin: false,
+        is_premium: false,
+        has_api_key: false,
+      },
+      token: credential,
+      loading: false,
+    });
+    await get().refreshUser();
   },
 
   refreshUser: async () => {
@@ -228,13 +325,15 @@ export const useStore = create<CombinedStore>((set, get) => ({
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!r.ok) {
-        // 401 / 403: invalid token or Supabase JWT secret not configured.
-        // In showcase/offline mode, grant access so the canvas is not blocked.
         const { user } = get();
         if (user) set({ user: { ...user, has_api_key: true } });
         return;
       }
-      const data = await r.json();
+      const data = await r.json() as {
+        id?: number; email?: string; name?: string | null;
+        avatar_url?: string | null; is_admin?: boolean;
+        is_premium?: boolean; has_api_key?: boolean;
+      };
       set({
         user: {
           id: data.id ?? 0,
@@ -247,14 +346,13 @@ export const useStore = create<CombinedStore>((set, get) => ({
         },
       });
     } catch {
-      // Network error: backend offline. Grant access so the user isn't blocked.
       const { user } = get();
       if (user) set({ user: { ...user, has_api_key: true } });
     }
   },
 
   signOut: async () => {
-    if (isSupabaseConfigured) await supabase.auth.signOut();
+    clearToken();
     set({ user: null, token: null });
   },
 

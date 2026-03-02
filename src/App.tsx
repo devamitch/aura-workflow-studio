@@ -1,3 +1,4 @@
+import { GoogleOAuthProvider } from "@react-oauth/google";
 import React, { useEffect, useState } from "react";
 import { ReactFlowProvider } from "reactflow";
 import { AuthGate } from "./components/auth/AuthGate";
@@ -6,18 +7,17 @@ import { Header } from "./components/layout/Header";
 import { RightChatPanel } from "./components/layout/RightChatPanel";
 import { PipelineToolbar } from "./components/sidebar/Toolbar";
 import { IntegratedBottomBar } from "./components/ui/IntegratedBottomBar";
+import { GOOGLE_CLIENT_ID } from "./lib/google-auth";
 import { useStore } from "./store";
 
 const App: React.FC = () => {
   const [chatOpen, setChatOpen] = useState(false);
   const { theme, undo, redo } = useStore();
 
-  // Sync theme to body
   useEffect(() => {
     document.body.setAttribute("data-theme", theme);
   }, [theme]);
 
-  // Global keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const isMac = navigator.platform.toUpperCase().includes("MAC");
@@ -36,37 +36,28 @@ const App: React.FC = () => {
   }, [undo, redo]);
 
   return (
-    <AuthGate>
-      <ReactFlowProvider>
-        <div className="app-shell">
-          {/* ── Top header ── */}
-          <Header />
-
-          {/* ── Body: left palette + canvas + right chat ── */}
-          <div className="app-body">
-            {/* Left: node palette */}
-            <aside className="left-palette">
-              <PipelineToolbar />
-            </aside>
-
-            {/* Center: canvas */}
-            <main className="canvas-area">
-              <div className="canvas-bg-orbs" aria-hidden="true" />
-              <PipelineUI />
-
-              {/* Bottom control bar sits over the canvas */}
-              <IntegratedBottomBar
-                onToggleChat={() => setChatOpen((v) => !v)}
-                chatOpen={chatOpen}
-              />
-            </main>
-
-            {/* Right: collapsible AI chat panel */}
-            <RightChatPanel open={chatOpen} onClose={() => setChatOpen(false)} />
+    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+      <AuthGate>
+        <ReactFlowProvider>
+          <div className="app-shell">
+            <Header />
+            <div className="app-body">
+              <aside className="left-palette">
+                <PipelineToolbar />
+              </aside>
+              <main className="canvas-area">
+                <PipelineUI />
+                <IntegratedBottomBar
+                  onToggleChat={() => setChatOpen((v) => !v)}
+                  chatOpen={chatOpen}
+                />
+              </main>
+              <RightChatPanel open={chatOpen} onClose={() => setChatOpen(false)} />
+            </div>
           </div>
-        </div>
-      </ReactFlowProvider>
-    </AuthGate>
+        </ReactFlowProvider>
+      </AuthGate>
+    </GoogleOAuthProvider>
   );
 };
 
