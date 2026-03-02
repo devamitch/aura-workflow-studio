@@ -1,4 +1,4 @@
-import { Pencil, X } from "lucide-react";
+import { Palette, Pencil, Waves, X } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import {
   BaseEdge,
@@ -29,14 +29,13 @@ export const CustomEdge: React.FC<EdgeProps> = ({
   const deleteEdge = useStore((s) => s.deleteEdge);
   const updateEdgeLabel = useStore((s) => s.updateEdgeLabel);
   const allEdges = useStore((s) => s.edges);
+  const updateEdgeStyle = useStore((s) => s.updateEdgeStyle);
 
   useEffect(() => {
     setDraft((label as string) ?? "");
   }, [label]);
 
-  const parallelEdges = allEdges.filter(
-    (e) => e.source === source && e.target === target,
-  );
+  const parallelEdges = allEdges.filter((e) => e.source === source && e.target === target);
   const edgeIndex = parallelEdges.findIndex((e) => e.id === id);
   const parallelCount = parallelEdges.length;
   const curvature =
@@ -64,9 +63,40 @@ export const CustomEdge: React.FC<EdgeProps> = ({
     setEditing(true);
   };
 
+  const currentEdge = allEdges.find((e) => e.id === id);
+  const edgeColor =
+    (currentEdge?.data as any)?.edgeColor ??
+    "var(--text-300)";
+  const edgeVariant: "solid" | "dashed" =
+    ((currentEdge?.data as any)?.edgeVariant as "solid" | "dashed") ?? "solid";
+
+  const edgeStyle = {
+    ...style,
+    stroke: edgeColor,
+    strokeDasharray: edgeVariant === "dashed" ? "6 4" : undefined,
+  };
+
+  const cycleColor = () => {
+    const palette = [
+      "var(--text-300)",
+      "var(--node-emerald)",
+      "var(--node-violet)",
+      "var(--node-blue)",
+      "var(--node-amber)",
+      "var(--node-rose)",
+    ];
+    const idx = palette.indexOf(edgeColor);
+    const next = palette[(idx + 1 + palette.length) % palette.length];
+    updateEdgeStyle(id, { color: next });
+  };
+
+  const toggleVariant = () => {
+    updateEdgeStyle(id, { variant: edgeVariant === "solid" ? "dashed" : "solid" });
+  };
+
   return (
     <>
-      <BaseEdge path={edgePath} markerEnd={markerEnd} style={style} />
+      <BaseEdge path={edgePath} markerEnd={markerEnd} style={edgeStyle} />
       <EdgeLabelRenderer>
         <div
           style={{
@@ -104,6 +134,20 @@ export const CustomEdge: React.FC<EdgeProps> = ({
                     title="Name connection"
                   >
                     <Pencil size={9} />
+                  </button>
+                  <button
+                    className="edge-action-btn"
+                    onClick={cycleColor}
+                    title="Cycle connection color"
+                  >
+                    <Palette size={9} />
+                  </button>
+                  <button
+                    className="edge-action-btn"
+                    onClick={toggleVariant}
+                    title="Toggle solid/dashed"
+                  >
+                    <Waves size={9} />
                   </button>
                   <button
                     className="edge-delete-btn"

@@ -1,22 +1,23 @@
-import { Menu, X } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { ReactFlowProvider } from "reactflow";
+import { AuthGate } from "./components/auth/AuthGate";
 import { PipelineUI } from "./components/canvas/PipelineUI";
+import { Header } from "./components/layout/Header";
+import { RightChatPanel } from "./components/layout/RightChatPanel";
 import { PipelineToolbar } from "./components/sidebar/Toolbar";
 import { IntegratedBottomBar } from "./components/ui/IntegratedBottomBar";
-import { ThemeToggle } from "./components/ui/ThemeToggle";
 import { useStore } from "./store";
 
 const App: React.FC = () => {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const undo = useStore((s) => s.undo);
-  const redo = useStore((s) => s.redo);
-  const { theme } = useStore();
+  const [chatOpen, setChatOpen] = useState(false);
+  const { theme, undo, redo } = useStore();
 
+  // Sync theme to body
   useEffect(() => {
     document.body.setAttribute("data-theme", theme);
   }, [theme]);
 
+  // Global keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const isMac = navigator.platform.toUpperCase().includes("MAC");
@@ -28,44 +29,44 @@ const App: React.FC = () => {
         e.preventDefault();
         redo();
       }
-      if (e.key === "Escape") setIsSidebarOpen(false);
+      if (e.key === "Escape") setChatOpen(false);
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [undo, redo]);
 
   return (
-    <ReactFlowProvider>
-      <div className="app-container">
-        <button
-          className="mobile-toggle-btn"
-          onClick={() => setIsSidebarOpen((v) => !v)}
-          aria-label={isSidebarOpen ? "Close menu" : "Open menu"}
-        >
-          {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
-        </button>
+    <AuthGate>
+      <ReactFlowProvider>
+        <div className="app-shell">
+          {/* ── Top header ── */}
+          <Header />
 
-        <div
-          className={`sidebar-backdrop ${isSidebarOpen ? "visible" : ""}`}
-          onClick={() => setIsSidebarOpen(false)}
-          aria-hidden="true"
-        />
+          {/* ── Body: left palette + canvas + right chat ── */}
+          <div className="app-body">
+            {/* Left: node palette */}
+            <aside className="left-palette">
+              <PipelineToolbar />
+            </aside>
 
-        <div className={`sidebar-container ${isSidebarOpen ? "open" : ""}`}>
-          <PipelineToolbar />
+            {/* Center: canvas */}
+            <main className="canvas-area">
+              <div className="canvas-bg-orbs" aria-hidden="true" />
+              <PipelineUI />
+
+              {/* Bottom control bar sits over the canvas */}
+              <IntegratedBottomBar
+                onToggleChat={() => setChatOpen((v) => !v)}
+                chatOpen={chatOpen}
+              />
+            </main>
+
+            {/* Right: collapsible AI chat panel */}
+            <RightChatPanel open={chatOpen} onClose={() => setChatOpen(false)} />
+          </div>
         </div>
-
-        <main className="main-content">
-          <section className="canvas-wrapper">
-            <div className="canvas-bg-orbs" aria-hidden="true" />
-
-            <PipelineUI />
-            <ThemeToggle />
-            <IntegratedBottomBar />
-          </section>
-        </main>
-      </div>
-    </ReactFlowProvider>
+      </ReactFlowProvider>
+    </AuthGate>
   );
 };
 
