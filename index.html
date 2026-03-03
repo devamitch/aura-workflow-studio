@@ -2,19 +2,118 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- ─── Primary SEO ───────────────────────────────────────────── -->
+    <title>AuraFlow — Visual AI Workflow Studio</title>
     <meta
       name="description"
-      content="Aura — Visual AI & RAG workflow studio for non-technical teams."
+      content="Build, visualize and run AI pipelines visually. No-code LLM orchestration with GPT-4o, Claude, Gemini and more. The best n8n alternative for AI workflows."
     />
-    <title>Aura — Workflow Studio</title>
+    <meta
+      name="keywords"
+      content="AI workflow builder, LLM orchestration, visual pipeline, no-code AI, RAG pipeline, GPT-4o, Claude, Gemini, n8n alternative, automation studio"
+    />
+    <meta name="author" content="Amit Chakraborty" />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://auraflow.ai/" />
+
+    <!-- ─── Open Graph ────────────────────────────────────────────── -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://auraflow.ai/" />
+    <meta property="og:title" content="AuraFlow — Visual AI Workflow Studio" />
+    <meta
+      property="og:description"
+      content="Build, visualize and run AI pipelines visually. No-code LLM orchestration with GPT-4o, Claude 3.5, Gemini Pro and more."
+    />
+    <meta property="og:image" content="https://auraflow.ai/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:site_name" content="AuraFlow" />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- ─── Twitter / X Card ─────────────────────────────────────── -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@auraflow_ai" />
+    <meta name="twitter:creator" content="@devamit_co" />
+    <meta name="twitter:title" content="AuraFlow — Visual AI Workflow Studio" />
+    <meta
+      name="twitter:description"
+      content="Build, visualize and run AI pipelines visually. No-code LLM orchestration with GPT-4o, Claude 3.5, Gemini Pro and more."
+    />
+    <meta name="twitter:image" content="https://auraflow.ai/og-image.png" />
+
+    <!-- ─── PWA / Theme ──────────────────────────────────────────── -->
+    <meta name="theme-color" content="#6366f1" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="application-name" content="AuraFlow" />
+    <meta name="apple-mobile-web-app-title" content="AuraFlow" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+
+    <!-- ─── Icons ────────────────────────────────────────────────── -->
+    <link rel="icon" type="image/png" href="/app-icon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/app-icon.png" />
+    <link rel="mask-icon" href="/app-icon.png" color="#6366f1" />
+
+    <!-- ─── Fonts: Syne (display) + Figtree (body) + JetBrains Mono ─ -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Figtree:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=JetBrains+Mono:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
+
+    <!-- ─── JSON-LD structured data ──────────────────────────────── -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "AuraFlow",
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "Web",
+        "description": "Visual AI workflow studio for building LLM pipelines, RAG systems, and automation without code.",
+        "url": "https://auraflow.ai/",
+        "author": {
+          "@type": "Person",
+          "name": "Amit Chakraborty",
+          "url": "https://devamit.co.in"
+        },
+        "offers": [
+          {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD",
+            "name": "Free"
+          },
+          {
+            "@type": "Offer",
+            "price": "35",
+            "priceCurrency": "USD",
+            "name": "Pro"
+          },
+          {
+            "@type": "Offer",
+            "price": "299",
+            "priceCurrency": "USD",
+            "name": "Annual"
+          }
+        ],
+        "screenshot": "https://auraflow.ai/og-image.png",
+        "featureList": [
+          "Visual AI pipeline builder",
+          "GPT-4o, Claude 3.5 Sonnet, Gemini Pro support",
+          "RAG pipelines with vector DB",
+          "No-code LLM orchestration",
+          "Export to Python, n8n, Zapier"
+        ]
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

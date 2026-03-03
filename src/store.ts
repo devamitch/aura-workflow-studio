@@ -1,3 +1,4 @@
+import { googleLogout } from "@react-oauth/google";
 import {
   MarkerType,
   addEdge,
@@ -8,7 +9,6 @@ import {
   type NodeChange,
 } from "reactflow";
 import { create } from "zustand";
-import type { HandleConfig, PipelineEdge, PipelineNode } from "./types";
 import {
   clearToken,
   decodeJwtPayload,
@@ -17,6 +17,7 @@ import {
   saveToken,
   type GooglePayload,
 } from "./lib/google-auth";
+import type { HandleConfig, PipelineEdge, PipelineNode } from "./types";
 
 // ─── Auth Types ────────────────────────────────────────────────────────────────
 export interface AuthUser {
@@ -35,13 +36,23 @@ const demoNodes: PipelineNode[] = [
     id: "d-input1",
     type: "customInput",
     position: { x: 60, y: 80 },
-    data: { id: "d-input1", nodeType: "customInput", inputName: "user_query", inputType: "Text" },
+    data: {
+      id: "d-input1",
+      nodeType: "customInput",
+      inputName: "user_query",
+      inputType: "Text",
+    },
   },
   {
     id: "d-input2",
     type: "customInput",
     position: { x: 60, y: 330 },
-    data: { id: "d-input2", nodeType: "customInput", inputName: "topic", inputType: "Text" },
+    data: {
+      id: "d-input2",
+      nodeType: "customInput",
+      inputName: "topic",
+      inputType: "Text",
+    },
   },
   {
     id: "d-text",
@@ -57,13 +68,22 @@ const demoNodes: PipelineNode[] = [
     id: "d-api",
     type: "api",
     position: { x: 420, y: 440 },
-    data: { id: "d-api", nodeType: "api", method: "GET", url: "https://api.research.io/search" },
+    data: {
+      id: "d-api",
+      nodeType: "api",
+      method: "GET",
+      url: "https://api.research.io/search",
+    },
   },
   {
     id: "d-filter",
     type: "filter",
     position: { x: 420, y: 640 },
-    data: { id: "d-filter", nodeType: "filter", condition: "value.relevance_score > 0.7" },
+    data: {
+      id: "d-filter",
+      nodeType: "filter",
+      condition: "value.relevance_score > 0.7",
+    },
   },
   {
     id: "d-llm",
@@ -81,18 +101,86 @@ const demoNodes: PipelineNode[] = [
     id: "d-output",
     type: "customOutput",
     position: { x: 1060, y: 300 },
-    data: { id: "d-output", nodeType: "customOutput", outputName: "research_report", outputType: "Text" },
+    data: {
+      id: "d-output",
+      nodeType: "customOutput",
+      outputName: "research_report",
+      outputType: "Text",
+    },
   },
 ];
 
 const demoEdges: PipelineEdge[] = [
-  { id: "de-1", source: "d-input1", sourceHandle: "d-input1-value", target: "d-llm", targetHandle: "d-llm-prompt", type: "smoothstep", animated: true, markerEnd: { type: MarkerType.Arrow, height: 20, width: 20 } },
-  { id: "de-2", source: "d-text", sourceHandle: "d-text-value", target: "d-llm", targetHandle: "d-llm-system", type: "smoothstep", animated: true, markerEnd: { type: MarkerType.Arrow, height: 20, width: 20 } },
-  { id: "de-3", source: "d-input2", sourceHandle: "d-input2-value", target: "d-api", targetHandle: "d-api-body", type: "smoothstep", animated: true, markerEnd: { type: MarkerType.Arrow, height: 20, width: 20 } },
-  { id: "de-4", source: "d-api", sourceHandle: "d-api-response", target: "d-filter", targetHandle: "d-filter-input", type: "smoothstep", animated: true, markerEnd: { type: MarkerType.Arrow, height: 20, width: 20 } },
-  { id: "de-5", source: "d-llm", sourceHandle: "d-llm-response", target: "d-merge", targetHandle: "d-merge-input-a", type: "smoothstep", animated: true, markerEnd: { type: MarkerType.Arrow, height: 20, width: 20 } },
-  { id: "de-6", source: "d-filter", sourceHandle: "d-filter-pass", target: "d-merge", targetHandle: "d-merge-input-b", type: "smoothstep", animated: true, markerEnd: { type: MarkerType.Arrow, height: 20, width: 20 } },
-  { id: "de-7", source: "d-merge", sourceHandle: "d-merge-merged", target: "d-output", targetHandle: "d-output-value", type: "smoothstep", animated: true, markerEnd: { type: MarkerType.Arrow, height: 20, width: 20 } },
+  {
+    id: "de-1",
+    source: "d-input1",
+    sourceHandle: "d-input1-value",
+    target: "d-llm",
+    targetHandle: "d-llm-prompt",
+    type: "smoothstep",
+    animated: true,
+    markerEnd: { type: MarkerType.Arrow, height: 20, width: 20 },
+  },
+  {
+    id: "de-2",
+    source: "d-text",
+    sourceHandle: "d-text-value",
+    target: "d-llm",
+    targetHandle: "d-llm-system",
+    type: "smoothstep",
+    animated: true,
+    markerEnd: { type: MarkerType.Arrow, height: 20, width: 20 },
+  },
+  {
+    id: "de-3",
+    source: "d-input2",
+    sourceHandle: "d-input2-value",
+    target: "d-api",
+    targetHandle: "d-api-body",
+    type: "smoothstep",
+    animated: true,
+    markerEnd: { type: MarkerType.Arrow, height: 20, width: 20 },
+  },
+  {
+    id: "de-4",
+    source: "d-api",
+    sourceHandle: "d-api-response",
+    target: "d-filter",
+    targetHandle: "d-filter-input",
+    type: "smoothstep",
+    animated: true,
+    markerEnd: { type: MarkerType.Arrow, height: 20, width: 20 },
+  },
+  {
+    id: "de-5",
+    source: "d-llm",
+    sourceHandle: "d-llm-response",
+    target: "d-merge",
+    targetHandle: "d-merge-input-a",
+    type: "smoothstep",
+    animated: true,
+    markerEnd: { type: MarkerType.Arrow, height: 20, width: 20 },
+  },
+  {
+    id: "de-6",
+    source: "d-filter",
+    sourceHandle: "d-filter-pass",
+    target: "d-merge",
+    targetHandle: "d-merge-input-b",
+    type: "smoothstep",
+    animated: true,
+    markerEnd: { type: MarkerType.Arrow, height: 20, width: 20 },
+  },
+  {
+    id: "de-7",
+    source: "d-merge",
+    sourceHandle: "d-merge-merged",
+    target: "d-output",
+    targetHandle: "d-output-value",
+    type: "smoothstep",
+    animated: true,
+    markerEnd: { type: MarkerType.Arrow, height: 20, width: 20 },
+  },
 ];
 
 // ─── Workflow Persistence ──────────────────────────────────────────────────────
@@ -109,13 +197,17 @@ export interface SavedWorkflow {
 }
 
 function readSavedWorkflows(): SavedWorkflow[] {
-  try { return JSON.parse(localStorage.getItem(LS_KEY) || "[]"); } catch { return []; }
+  try {
+    return JSON.parse(localStorage.getItem(LS_KEY) || "[]");
+  } catch {
+    return [];
+  }
 }
 function writeSavedWorkflows(list: SavedWorkflow[]): void {
-  try { localStorage.setItem(LS_KEY, JSON.stringify(list)); } catch {}
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(list));
+  } catch {}
 }
-
-interface NodeIDs { [type: string]: number }
 
 // ─── Plan & Credits ─────────────────────────────────────────────────────────────
 export type PlanTier = "free" | "pro" | "annual";
@@ -124,14 +216,38 @@ export interface UserPlan {
   tier: PlanTier;
   creditsUsed: number;
   creditsTotal: number;
-  creditsExtra: number;   // purchased add-on credits
+  creditsExtra: number; // purchased add-on credits
   renewsAt: string | null;
 }
 
-export const PLAN_LIMITS: Record<PlanTier, { aiGenerations: number; modelAccess: string[] }> = {
-  free:   { aiGenerations: 20,        modelAccess: ["gemini-1.5-flash"] },
-  pro:    { aiGenerations: Infinity,  modelAccess: ["gemini-1.5-flash", "gemini-1.5-pro", "gpt-4o", "gpt-4-turbo", "claude-3-5-sonnet", "claude-3-haiku"] },
-  annual: { aiGenerations: Infinity,  modelAccess: ["gemini-1.5-flash", "gemini-1.5-pro", "gpt-4o", "gpt-4-turbo", "claude-3-5-sonnet", "claude-3-haiku", "claude-3-opus"] },
+export const PLAN_LIMITS: Record<
+  PlanTier,
+  { aiGenerations: number; modelAccess: string[] }
+> = {
+  free: { aiGenerations: 20, modelAccess: ["gemini-1.5-flash"] },
+  pro: {
+    aiGenerations: Infinity,
+    modelAccess: [
+      "gemini-1.5-flash",
+      "gemini-1.5-pro",
+      "gpt-4o",
+      "gpt-4-turbo",
+      "claude-3-5-sonnet",
+      "claude-3-haiku",
+    ],
+  },
+  annual: {
+    aiGenerations: Infinity,
+    modelAccess: [
+      "gemini-1.5-flash",
+      "gemini-1.5-pro",
+      "gpt-4o",
+      "gpt-4-turbo",
+      "claude-3-5-sonnet",
+      "claude-3-haiku",
+      "claude-3-opus",
+    ],
+  },
 };
 
 const PLAN_LS_KEY = "aura_user_plan";
@@ -140,13 +256,23 @@ function loadPlan(): UserPlan {
     const raw = localStorage.getItem(PLAN_LS_KEY);
     if (raw) return JSON.parse(raw) as UserPlan;
   } catch {}
-  return { tier: "free", creditsUsed: 0, creditsTotal: 20, creditsExtra: 0, renewsAt: null };
+  return {
+    tier: "free",
+    creditsUsed: 0,
+    creditsTotal: 20,
+    creditsExtra: 0,
+    renewsAt: null,
+  };
 }
 function savePlan(plan: UserPlan) {
-  try { localStorage.setItem(PLAN_LS_KEY, JSON.stringify(plan)); } catch {}
+  try {
+    localStorage.setItem(PLAN_LS_KEY, JSON.stringify(plan));
+  } catch {}
 }
 
-interface NodeIDs { [type: string]: number }
+interface NodeIDs {
+  [type: string]: number;
+}
 
 // ─── Store Interface ───────────────────────────────────────────────────────────
 interface CombinedStore {
@@ -155,14 +281,17 @@ interface CombinedStore {
   token: string | null;
   loading: boolean;
   bootstrapAuth: () => void;
-  signInWithGoogle: (credential: string) => Promise<void>;
+  signInWithGoogle: (
+    credential: string,
+    userInfo?: { sub: string; email: string; name?: string; picture?: string },
+  ) => Promise<void>;
   refreshUser: () => Promise<void>;
   signOut: () => Promise<void>;
 
   // Plan & Credits
   plan: UserPlan;
   setPlan: (tier: PlanTier, extraCredits?: number) => void;
-  consumeCredit: () => boolean;  // returns false if out of credits
+  consumeCredit: () => boolean; // returns false if out of credits
   addExtraCredits: (amount: number) => void;
 
   // Theme
@@ -189,13 +318,20 @@ interface CombinedStore {
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
   onConnect: (connection: Connection) => void;
-  updateNodeField: (nodeId: string, fieldName: string, fieldValue: unknown) => void;
+  updateNodeField: (
+    nodeId: string,
+    fieldName: string,
+    fieldValue: unknown,
+  ) => void;
   deleteNode: (nodeId: string) => void;
   addNodeHandle: (nodeId: string, handle: HandleConfig) => void;
   removeNodeHandle: (nodeId: string, handleId: string) => void;
   deleteEdge: (edgeId: string) => void;
   updateEdgeLabel: (edgeId: string, label: string) => void;
-  updateEdgeStyle: (edgeId: string, style: { color?: string; variant?: "solid" | "dashed" }) => void;
+  updateEdgeStyle: (
+    edgeId: string,
+    style: { color?: string; variant?: "solid" | "dashed" },
+  ) => void;
   clearCanvas: () => void;
   loadDemo: () => void;
   applyGeneratedGraph: (nodes: PipelineNode[], edges: PipelineEdge[]) => void;
@@ -211,7 +347,11 @@ interface CombinedStore {
 }
 
 function makeEdge(
-  overrides: Partial<PipelineEdge> & { id: string; source: string; target: string },
+  overrides: Partial<PipelineEdge> & {
+    id: string;
+    source: string;
+    target: string;
+  },
 ): PipelineEdge {
   return {
     type: "smoothstep",
@@ -221,7 +361,8 @@ function makeEdge(
   };
 }
 
-const API_URL = () => (import.meta.env.VITE_API_URL as string) || "http://localhost:8000";
+const API_URL = () =>
+  (import.meta.env.VITE_API_URL as string) || "http://localhost:8000";
 
 // ─── Store Implementation ──────────────────────────────────────────────────────
 export const useStore = create<CombinedStore>((set, get) => ({
@@ -240,9 +381,10 @@ export const useStore = create<CombinedStore>((set, get) => ({
       creditsUsed: 0,
       creditsTotal: total,
       creditsExtra: extraCredits,
-      renewsAt: tier !== "free"
-        ? new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString()
-        : null,
+      renewsAt:
+        tier !== "free"
+          ? new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString()
+          : null,
     };
     savePlan(plan);
     set({ plan });
@@ -250,7 +392,7 @@ export const useStore = create<CombinedStore>((set, get) => ({
 
   consumeCredit: () => {
     const { plan } = get();
-    if (plan.tier !== "free") return true;  // paid plans: unlimited
+    if (plan.tier !== "free") return true; // paid plans: unlimited
     const available = plan.creditsTotal + plan.creditsExtra - plan.creditsUsed;
     if (available <= 0) return false;
     const updated = { ...plan, creditsUsed: plan.creditsUsed + 1 };
@@ -298,15 +440,36 @@ export const useStore = create<CombinedStore>((set, get) => ({
     }
   },
 
-  signInWithGoogle: async (credential: string) => {
+  signInWithGoogle: async (
+    credential: string,
+    userInfo?: { sub: string; email: string; name?: string; picture?: string },
+  ) => {
     saveToken(credential);
-    const payload = decodeJwtPayload<GooglePayload>(credential);
+    // If pre-decoded userInfo is supplied (access-token flow), use it directly;
+    // otherwise try to decode the credential as a JWT (one-tap/credential flow).
+    let email = "";
+    let name: string | null = null;
+    let picture: string | null = null;
+    if (userInfo) {
+      email = userInfo.email;
+      name = userInfo.name ?? null;
+      picture = userInfo.picture ?? null;
+    } else {
+      try {
+        const payload = decodeJwtPayload<GooglePayload>(credential);
+        email = payload.email;
+        name = payload.name ?? null;
+        picture = payload.picture ?? null;
+      } catch {
+        // credential is not a JWT; user info unavailable without separate fetch
+      }
+    }
     set({
       user: {
         id: 0,
-        email: payload.email,
-        name: payload.name ?? null,
-        avatar_url: payload.picture ?? null,
+        email,
+        name,
+        avatar_url: picture,
         is_admin: false,
         is_premium: false,
         has_api_key: false,
@@ -329,10 +492,14 @@ export const useStore = create<CombinedStore>((set, get) => ({
         if (user) set({ user: { ...user, has_api_key: true } });
         return;
       }
-      const data = await r.json() as {
-        id?: number; email?: string; name?: string | null;
-        avatar_url?: string | null; is_admin?: boolean;
-        is_premium?: boolean; has_api_key?: boolean;
+      const data = (await r.json()) as {
+        id?: number;
+        email?: string;
+        name?: string | null;
+        avatar_url?: string | null;
+        is_admin?: boolean;
+        is_premium?: boolean;
+        has_api_key?: boolean;
       };
       set({
         user: {
@@ -353,6 +520,7 @@ export const useStore = create<CombinedStore>((set, get) => ({
 
   signOut: async () => {
     clearToken();
+    googleLogout();
     set({ user: null, token: null });
   },
 
@@ -385,7 +553,8 @@ export const useStore = create<CombinedStore>((set, get) => ({
   },
 
   undo: () => {
-    const { nodes, edges, pastNodes, pastEdges, futureNodes, futureEdges } = get();
+    const { nodes, edges, pastNodes, pastEdges, futureNodes, futureEdges } =
+      get();
     if (pastNodes.length === 0) return;
     set({
       nodes: pastNodes[pastNodes.length - 1],
@@ -398,7 +567,8 @@ export const useStore = create<CombinedStore>((set, get) => ({
   },
 
   redo: () => {
-    const { nodes, edges, pastNodes, pastEdges, futureNodes, futureEdges } = get();
+    const { nodes, edges, pastNodes, pastEdges, futureNodes, futureEdges } =
+      get();
     if (futureNodes.length === 0) return;
     set({
       nodes: futureNodes[0],
@@ -435,7 +605,12 @@ export const useStore = create<CombinedStore>((set, get) => ({
     get().takeSnapshot();
     set({
       edges: addEdge(
-        makeEdge({ ...connection, id: `e-${Date.now()}`, source: connection.source ?? "", target: connection.target ?? "" }),
+        makeEdge({
+          ...connection,
+          id: `e-${Date.now()}`,
+          source: connection.source ?? "",
+          target: connection.target ?? "",
+        }),
         get().edges,
       ),
     });
@@ -443,14 +618,22 @@ export const useStore = create<CombinedStore>((set, get) => ({
 
   updateNodeField: (nodeId, fieldName, fieldValue) => {
     get().takeSnapshot();
-    set({ nodes: get().nodes.map((n) => n.id === nodeId ? { ...n, data: { ...n.data, [fieldName]: fieldValue } } : n) });
+    set({
+      nodes: get().nodes.map((n) =>
+        n.id === nodeId
+          ? { ...n, data: { ...n.data, [fieldName]: fieldValue } }
+          : n,
+      ),
+    });
   },
 
   deleteNode: (nodeId: string) => {
     get().takeSnapshot();
     set({
       nodes: get().nodes.filter((n) => n.id !== nodeId),
-      edges: get().edges.filter((e) => e.source !== nodeId && e.target !== nodeId),
+      edges: get().edges.filter(
+        (e) => e.source !== nodeId && e.target !== nodeId,
+      ),
     });
   },
 
@@ -459,7 +642,17 @@ export const useStore = create<CombinedStore>((set, get) => ({
     set({
       nodes: get().nodes.map((n) =>
         n.id === nodeId
-          ? { ...n, data: { ...n.data, customHandles: [...((n.data.customHandles as HandleConfig[] | undefined) ?? []), handle] } }
+          ? {
+              ...n,
+              data: {
+                ...n.data,
+                customHandles: [
+                  ...((n.data.customHandles as HandleConfig[] | undefined) ??
+                    []),
+                  handle,
+                ],
+              },
+            }
           : n,
       ),
     });
@@ -471,10 +664,21 @@ export const useStore = create<CombinedStore>((set, get) => ({
     set({
       nodes: get().nodes.map((n) =>
         n.id === nodeId
-          ? { ...n, data: { ...n.data, customHandles: ((n.data.customHandles as HandleConfig[] | undefined) ?? []).filter((h) => h.id !== handleId) } }
+          ? {
+              ...n,
+              data: {
+                ...n.data,
+                customHandles: (
+                  (n.data.customHandles as HandleConfig[] | undefined) ?? []
+                ).filter((h) => h.id !== handleId),
+              },
+            }
           : n,
       ),
-      edges: get().edges.filter((e) => e.sourceHandle !== fullHandleId && e.targetHandle !== fullHandleId),
+      edges: get().edges.filter(
+        (e) =>
+          e.sourceHandle !== fullHandleId && e.targetHandle !== fullHandleId,
+      ),
     });
   },
 
@@ -485,7 +689,11 @@ export const useStore = create<CombinedStore>((set, get) => ({
 
   updateEdgeLabel: (edgeId: string, label: string) => {
     get().takeSnapshot();
-    set({ edges: get().edges.map((e) => e.id === edgeId ? { ...e, label: label || undefined } : e) });
+    set({
+      edges: get().edges.map((e) =>
+        e.id === edgeId ? { ...e, label: label || undefined } : e,
+      ),
+    });
   },
 
   updateEdgeStyle: (edgeId, style) => {
@@ -497,8 +705,11 @@ export const useStore = create<CombinedStore>((set, get) => ({
               ...e,
               data: {
                 ...(e.data as Record<string, unknown>),
-                edgeColor: style.color ?? (e.data as Record<string, unknown>)?.edgeColor,
-                edgeVariant: style.variant ?? (e.data as Record<string, unknown>)?.edgeVariant,
+                edgeColor:
+                  style.color ?? (e.data as Record<string, unknown>)?.edgeColor,
+                edgeVariant:
+                  style.variant ??
+                  (e.data as Record<string, unknown>)?.edgeVariant,
               },
             }
           : e,
@@ -540,8 +751,15 @@ export const useStore = create<CombinedStore>((set, get) => ({
     if (!token) return;
     void fetch(`${API_URL()}/pipelines`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ name: wfName, description: null, graph: { nodes, edges } }),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        name: wfName,
+        description: null,
+        graph: { nodes, edges },
+      }),
     }).catch(() => {});
   },
 
@@ -558,7 +776,8 @@ export const useStore = create<CombinedStore>((set, get) => ({
     writeSavedWorkflows(readSavedWorkflows().filter((w) => w.id !== id));
   },
 
-  exportToJSON: (): string => JSON.stringify({ nodes: get().nodes, edges: get().edges }, null, 2),
+  exportToJSON: (): string =>
+    JSON.stringify({ nodes: get().nodes, edges: get().edges }, null, 2),
 
   importFromJSON: (json: string): { ok: boolean; error?: string } => {
     try {
@@ -569,7 +788,10 @@ export const useStore = create<CombinedStore>((set, get) => ({
       set({ nodes: parsed.nodes, edges: parsed.edges });
       return { ok: true };
     } catch (e) {
-      return { ok: false, error: e instanceof Error ? e.message : "Parse error" };
+      return {
+        ok: false,
+        error: e instanceof Error ? e.message : "Parse error",
+      };
     }
   },
 
@@ -577,15 +799,26 @@ export const useStore = create<CombinedStore>((set, get) => ({
     const { nodes, edges } = get();
     if (nodes.length === 0) return;
 
-    const COL_W = 310, ROW_H = 200, PAD_X = 60, PAD_Y = 80;
+    const COL_W = 310,
+      ROW_H = 200,
+      PAD_X = 60,
+      PAD_Y = 80;
     const adj: Record<string, string[]> = {};
     const inDeg: Record<string, number> = {};
-    nodes.forEach((n) => { adj[n.id] = []; inDeg[n.id] = 0; });
-    edges.forEach((e) => { if (adj[e.source]) adj[e.source].push(e.target); inDeg[e.target] = (inDeg[e.target] || 0) + 1; });
+    nodes.forEach((n) => {
+      adj[n.id] = [];
+      inDeg[n.id] = 0;
+    });
+    edges.forEach((e) => {
+      if (adj[e.source]) adj[e.source].push(e.target);
+      inDeg[e.target] = (inDeg[e.target] || 0) + 1;
+    });
 
     const layer: Record<string, number> = {};
     const queue = nodes.filter((n) => inDeg[n.id] === 0).map((n) => n.id);
-    queue.forEach((id) => { layer[id] = 0; });
+    queue.forEach((id) => {
+      layer[id] = 0;
+    });
 
     while (queue.length > 0) {
       const id = queue.shift()!;
@@ -596,7 +829,9 @@ export const useStore = create<CombinedStore>((set, get) => ({
       });
     }
 
-    nodes.forEach((n) => { if (layer[n.id] === undefined) layer[n.id] = 0; });
+    nodes.forEach((n) => {
+      if (layer[n.id] === undefined) layer[n.id] = 0;
+    });
     const maxLayer = Math.max(0, ...nodes.map((n) => layer[n.id]));
     const groups: string[][] = Array.from({ length: maxLayer + 1 }, () => []);
     nodes.forEach((n) => groups[layer[n.id]].push(n.id));
@@ -607,7 +842,10 @@ export const useStore = create<CombinedStore>((set, get) => ({
       const group = groups[l];
       const idx = group.indexOf(n.id);
       const startY = PAD_Y + (totalH - group.length * ROW_H) / 2;
-      return { ...n, position: { x: PAD_X + l * COL_W, y: startY + idx * ROW_H } };
+      return {
+        ...n,
+        position: { x: PAD_X + l * COL_W, y: startY + idx * ROW_H },
+      };
     });
 
     get().takeSnapshot();

@@ -6,6 +6,7 @@ interface DraggableNodeProps {
   type: string;
   label: string;
   icon: LucideIcon;
+  description?: string;
 }
 
 function isTouchDevice(): boolean {
@@ -16,6 +17,7 @@ export const DraggableNode: React.FC<DraggableNodeProps> = ({
   type,
   label,
   icon: Icon,
+  description,
 }) => {
   const getNodeID = useStore((s) => s.getNodeID);
   const addNode = useStore((s) => s.addNode);
@@ -46,12 +48,15 @@ export const DraggableNode: React.FC<DraggableNodeProps> = ({
       onDragStart={onDragStart}
       onClick={onClick}
       draggable
-      title={`Drag to add ${label}`}
+      title={description || `Drag to add ${label}`}
     >
       <div className="draggable-node-icon">
         <Icon size={15} />
       </div>
-      <span className="draggable-node-label">{label}</span>
+      <div className="draggable-node-text">
+        <span className="draggable-node-label">{label}</span>
+        {description && <span className="draggable-node-desc">{description}</span>}
+      </div>
       <span className="draggable-node-tap-badge">
         <Plus size={8} style={{ display: "inline", marginRight: 2 }} />
         Add
