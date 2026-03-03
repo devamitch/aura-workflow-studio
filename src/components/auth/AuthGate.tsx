@@ -22,10 +22,6 @@ import {
 } from "../../lib/google-auth";
 import { useStore } from "../../store";
 
-interface Props {
-  children: React.ReactNode;
-}
-
 const PILLS = [
   { icon: Brain, label: "Multi-LLM" },
   { icon: GitBranch, label: "Visual Builder" },
@@ -87,7 +83,9 @@ const upsertSaved = (p: GooglePayload) => {
 };
 
 // ── Component ────────────────────────────────────────────────────────────────
-export const AuthGate: React.FC<Props> = ({ children }) => {
+import { Navigate } from "react-router-dom";
+
+export const AuthGate: React.FC = () => {
   const { user, loading, signInWithGoogle } = useStore();
   const [authError, setAuthError] = useState("");
   const [saved, setSaved] = useState<SavedAccount[]>([]);
@@ -163,7 +161,9 @@ export const AuthGate: React.FC<Props> = ({ children }) => {
     googleLogout();
   };
 
-  if (!isGoogleConfigured) return <>{children}</>;
+  if (!isGoogleConfigured || (user && !loading)) {
+    return <Navigate to="/" replace />;
+  }
 
   if (loading) {
     return (
@@ -181,134 +181,130 @@ export const AuthGate: React.FC<Props> = ({ children }) => {
     );
   }
 
-  if (!user) {
-    return (
-      <div className="auth-screen">
-        {/* Layered background - no dark overlay to let banner breathe! */}
-        <img src={authBanner} alt="" className="auth-bg-img" />
-        <div className="auth-orb auth-orb-1" />
-        <div className="auth-orb auth-orb-2" />
-        <div className="auth-orb auth-orb-3" />
-        <div className="auth-bg-grid" />
+  return (
+    <div className="auth-screen">
+      {/* Layered background - no dark overlay to let banner breathe! */}
+      <img src={authBanner} alt="" className="auth-bg-img" />
+      <div className="auth-orb auth-orb-1" />
+      <div className="auth-orb auth-orb-2" />
+      <div className="auth-orb auth-orb-3" />
+      <div className="auth-bg-grid" />
 
-        {/* Glass card */}
-        <div className="auth-center-card">
-          <div className="auth-card-glow" />
+      {/* Glass card */}
+      <div className="auth-center-card">
+        <div className="auth-card-glow" />
 
-          {/* Icon */}
-          <div className="auth-icon-ring">
-            <img src={appIcon} alt="AuraFlow" className="auth-icon-img" />
-          </div>
+        {/* Icon */}
+        <div className="auth-icon-ring">
+          <img src={appIcon} alt="AuraFlow" className="auth-icon-img" />
+        </div>
 
-          <div className="auth-brand-row">
-            <span className="auth-brand-name">
-              Aura<span>Flow</span>
-            </span>
-            <span className="auth-brand-beta">BETA</span>
-          </div>
+        <div className="auth-brand-row">
+          <span className="auth-brand-name">
+            Aura<span>Flow</span>
+          </span>
+          <span className="auth-brand-beta">BETA</span>
+        </div>
 
-          <h1 className="auth-headline">
-            Build AI pipelines{" "}
-            <span className="auth-headline-accent">visually</span>
-          </h1>
-          <p className="auth-subline">
-            No-code LLM orchestration, RAG workflows, and production AI
-            automation.
-          </p>
+        <h1 className="auth-headline">
+          Build AI pipelines{" "}
+          <span className="auth-headline-accent">visually</span>
+        </h1>
+        <p className="auth-subline">
+          No-code LLM orchestration, RAG workflows, and production AI
+          automation.
+        </p>
 
-          <div className="auth-pills-row">
-            {PILLS.map(({ icon: Icon, label }) => (
-              <div key={label} className="auth-pill">
-                <Icon size={13} />
-                <span>{label}</span>
+        <div className="auth-pills-row">
+          {PILLS.map(({ icon: Icon, label }) => (
+            <div key={label} className="auth-pill">
+              <Icon size={13} />
+              <span>{label}</span>
+            </div>
+          ))}
+        </div>
+
+        {saved.length > 0 && (
+          <div className="auth-saved-accounts">
+            <p className="auth-saved-label">Continue as</p>
+            {saved.map((acc) => (
+              <div
+                key={acc.sub}
+                className="auth-saved-row"
+                role="button"
+                tabIndex={0}
+                onClick={() => customGoogleLogin()}
+                title={`Sign in as ${acc.email}`}
+              >
+                {acc.picture ? (
+                  <img
+                    src={acc.picture}
+                    alt={acc.name ?? acc.email}
+                    className="auth-saved-avatar"
+                  />
+                ) : (
+                  <div className="auth-saved-avatar-fallback">
+                    {(acc.name ?? acc.email)[0].toUpperCase()}
+                  </div>
+                )}
+                <div className="auth-saved-info">
+                  {acc.name && (
+                    <span className="auth-saved-name">{acc.name}</span>
+                  )}
+                  <span className="auth-saved-email">{acc.email}</span>
+                </div>
+                <button
+                  className="auth-saved-remove"
+                  onClick={(e) => handleRemove(acc.sub, e)}
+                  title="Remove this account"
+                  aria-label="Remove saved account"
+                >
+                  <UserX size={14} />
+                </button>
               </div>
             ))}
-          </div>
-
-          {saved.length > 0 && (
-            <div className="auth-saved-accounts">
-              <p className="auth-saved-label">Continue as</p>
-              {saved.map((acc) => (
-                <div
-                  key={acc.sub}
-                  className="auth-saved-row"
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => customGoogleLogin()}
-                  title={`Sign in as ${acc.email}`}
-                >
-                  {acc.picture ? (
-                    <img
-                      src={acc.picture}
-                      alt={acc.name ?? acc.email}
-                      className="auth-saved-avatar"
-                    />
-                  ) : (
-                    <div className="auth-saved-avatar-fallback">
-                      {(acc.name ?? acc.email)[0].toUpperCase()}
-                    </div>
-                  )}
-                  <div className="auth-saved-info">
-                    {acc.name && (
-                      <span className="auth-saved-name">{acc.name}</span>
-                    )}
-                    <span className="auth-saved-email">{acc.email}</span>
-                  </div>
-                  <button
-                    className="auth-saved-remove"
-                    onClick={(e) => handleRemove(acc.sub, e)}
-                    title="Remove this account"
-                    aria-label="Remove saved account"
-                  >
-                    <UserX size={14} />
-                  </button>
-                </div>
-              ))}
-              <div className="auth-or-row">
-                <span>or use a different account</span>
-              </div>
+            <div className="auth-or-row">
+              <span>or use a different account</span>
             </div>
-          )}
+          </div>
+        )}
 
-          {/* ── Completely Custom Google Button ──
+        {/* ── Completely Custom Google Button ──
               ZERO white background frames injected by Google! */}
-          <button
-            className={`auth-google-btn${isSigningIn ? " auth-google-btn--loading" : ""}`}
-            onClick={() => customGoogleLogin()}
-            disabled={isSigningIn}
-          >
-            {isSigningIn ? <span className="auth-spinner" /> : <GoogleIcon />}
-            <span>{isSigningIn ? "Signing in…" : "Continue with Google"}</span>
-          </button>
+        <button
+          className={`auth-google-btn${isSigningIn ? " auth-google-btn--loading" : ""}`}
+          onClick={() => customGoogleLogin()}
+          disabled={isSigningIn}
+        >
+          {isSigningIn ? <span className="auth-spinner" /> : <GoogleIcon />}
+          <span>{isSigningIn ? "Signing in…" : "Continue with Google"}</span>
+        </button>
 
-          {authError && <p className="auth-error-text">{authError}</p>}
+        {authError && <p className="auth-error-text">{authError}</p>}
 
-          <div className="auth-trust-row">
-            <div className="auth-trust-item">
-              <Lock size={11} />
-              <span>AES-256 encrypted</span>
-            </div>
-            <div className="auth-trust-dot" />
-            <div className="auth-trust-item">
-              <Zap size={11} />
-              <span>Free forever</span>
-            </div>
+        <div className="auth-trust-row">
+          <div className="auth-trust-item">
+            <Lock size={11} />
+            <span>AES-256 encrypted</span>
           </div>
-
-          <p className="auth-terms">
-            By signing in you agree to our{" "}
-            <a href="#" onClick={(e) => e.preventDefault()}>
-              Terms
-            </a>{" "}
-            &{" "}
-            <a href="#" onClick={(e) => e.preventDefault()}>
-              Privacy Policy
-            </a>
-          </p>
+          <div className="auth-trust-dot" />
+          <div className="auth-trust-item">
+            <Zap size={11} />
+            <span>Free forever</span>
+          </div>
         </div>
-      </div>
-    );
-  }
 
-  return <>{children}</>;
+        <p className="auth-terms">
+          By signing in you agree to our{" "}
+          <a href="#" onClick={(e) => e.preventDefault()}>
+            Terms
+          </a>{" "}
+          &{" "}
+          <a href="#" onClick={(e) => e.preventDefault()}>
+            Privacy Policy
+          </a>
+        </p>
+      </div>
+    </div>
+  );
 };
