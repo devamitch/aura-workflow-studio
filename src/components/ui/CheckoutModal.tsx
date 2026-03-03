@@ -11,7 +11,6 @@
  *   VITE_RAZORPAY_LINK_PRO     e.g. https://rzp.io/l/abc
  *   VITE_RAZORPAY_LINK_ANNUAL  e.g. https://rzp.io/l/def
  */
-import React, { useState } from "react";
 import {
   Brain,
   Check,
@@ -24,18 +23,32 @@ import {
   X,
   Zap,
 } from "lucide-react";
+import React, { useState } from "react";
 import type { PlanTier } from "../../store";
 import { useStore } from "../../store";
 
 // ── Payment provider logo pills ───────────────────────────────────────────────
-const ProviderBadge: React.FC<{ name: string; color: string }> = ({ name, color }) => (
-  <span style={{ color, fontWeight: 800, fontFamily: "var(--font-display)", fontSize: 13 }}>
+const ProviderBadge: React.FC<{ name: string; color: string }> = ({
+  name,
+  color,
+}) => (
+  <span
+    style={{
+      color,
+      fontWeight: 800,
+      fontFamily: "var(--font-display)",
+      fontSize: 13,
+    }}
+  >
     {name}
   </span>
 );
 
 // ── Model access per tier ─────────────────────────────────────────────────────
-const TIER_MODELS: Record<string, { label: string; tier: PlanTier; note?: string }[]> = {
+const TIER_MODELS: Record<
+  string,
+  { label: string; tier: PlanTier; note?: string }[]
+> = {
   pro: [
     { label: "Gemini 1.5 Flash", tier: "free" },
     { label: "Gemini 1.5 Pro", tier: "pro" },
@@ -70,8 +83,10 @@ const PAYMENT_METHODS: PayMethod[] = [
     color: "#6772E5",
     currency: "both",
     getLink: (tier) => {
-      if (tier === "pro") return import.meta.env.VITE_STRIPE_LINK_PRO as string | undefined;
-      if (tier === "annual") return import.meta.env.VITE_STRIPE_LINK_ANNUAL as string | undefined;
+      if (tier === "pro")
+        return import.meta.env.VITE_STRIPE_LINK_PRO as string | undefined;
+      if (tier === "annual")
+        return import.meta.env.VITE_STRIPE_LINK_ANNUAL as string | undefined;
     },
     sdk: true,
   },
@@ -82,8 +97,10 @@ const PAYMENT_METHODS: PayMethod[] = [
     color: "#3395FF",
     currency: "INR",
     getLink: (tier) => {
-      if (tier === "pro") return import.meta.env.VITE_RAZORPAY_LINK_PRO as string | undefined;
-      if (tier === "annual") return import.meta.env.VITE_RAZORPAY_LINK_ANNUAL as string | undefined;
+      if (tier === "pro")
+        return import.meta.env.VITE_RAZORPAY_LINK_PRO as string | undefined;
+      if (tier === "annual")
+        return import.meta.env.VITE_RAZORPAY_LINK_ANNUAL as string | undefined;
     },
     sdk: true,
   },
@@ -115,12 +132,15 @@ function initiateRazorpaySdk(
   script.onload = () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const Rp = (window as any).Razorpay;
-    if (!Rp) { alert("Razorpay failed to load."); return; }
+    if (!Rp) {
+      alert("Razorpay failed to load.");
+      return;
+    }
     new Rp({
       key: import.meta.env.VITE_RAZORPAY_KEY_ID ?? "rzp_test_placeholder",
       amount: amount * 100,
       currency,
-      name: "AuraFlow",
+      name: "AuraStudio",
       description,
       handler: onSuccess,
       theme: { color: "#6366f1" },
@@ -168,7 +188,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         // Redirect to hosted payment page
         window.open(link, "_blank");
         // We can't confirm payment here without a webhook — just show info
-        alert("Complete payment in the new tab. Your plan will be upgraded after payment is confirmed.");
+        alert(
+          "Complete payment in the new tab. Your plan will be upgraded after payment is confirmed.",
+        );
         setPaying(false);
         onClose();
         return;
@@ -179,25 +201,53 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       if (method.id === "stripe-link" || method.id === "stripe") {
         const key = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string;
         if (!key || key === "pk_test_placeholder") {
-          alert("Stripe not fully configured. Add VITE_STRIPE_PUBLISHABLE_KEY + backend /billing/stripe-session.\n\n(Demo: simulating success)");
-          setTimeout(() => { onSuccess(); setPlan(tier); onClose(); }, 500);
+          alert(
+            "Stripe not fully configured. Add VITE_STRIPE_PUBLISHABLE_KEY + backend /billing/stripe-session.\n\n(Demo: simulating success)",
+          );
+          setTimeout(() => {
+            onSuccess();
+            setPlan(tier);
+            onClose();
+          }, 500);
           return;
         }
-        alert("Opening Stripe Checkout… (integrate backend /billing/stripe-session)");
-        setTimeout(() => { onSuccess(); setPlan(tier); onClose(); }, 500);
+        alert(
+          "Opening Stripe Checkout… (integrate backend /billing/stripe-session)",
+        );
+        setTimeout(() => {
+          onSuccess();
+          setPlan(tier);
+          onClose();
+        }, 500);
       } else if (method.id === "razorpay-link" || method.id === "razorpay") {
         initiateRazorpaySdk(
           amountNum,
           currency === "INR" ? "INR" : "USD",
-          `AuraFlow ${tierLabel} Plan`,
-          () => { onSuccess(); setPlan(tier); onClose(); },
+          `AuraStudio ${tierLabel} Plan`,
+          () => {
+            onSuccess();
+            setPlan(tier);
+            onClose();
+          },
         );
       } else if (method.id === "payu") {
-        alert(`PayU payment for ${displayPrice}.\nAdd VITE_PAYU_MERCHANT_KEY and backend for live PayU payments.\n\n(Demo: simulating success)`);
-        setTimeout(() => { onSuccess(); setPlan(tier); onClose(); }, 500);
+        alert(
+          `PayU payment for ${displayPrice}.\nAdd VITE_PAYU_MERCHANT_KEY and backend for live PayU payments.\n\n(Demo: simulating success)`,
+        );
+        setTimeout(() => {
+          onSuccess();
+          setPlan(tier);
+          onClose();
+        }, 500);
       } else {
-        alert(`PayPal: ${tierLabel} plan. Add VITE_PAYPAL_CLIENT_ID for live payments.\n\n(Demo: simulating success)`);
-        setTimeout(() => { onSuccess(); setPlan(tier); onClose(); }, 500);
+        alert(
+          `PayPal: ${tierLabel} plan. Add VITE_PAYPAL_CLIENT_ID for live payments.\n\n(Demo: simulating success)`,
+        );
+        setTimeout(() => {
+          onSuccess();
+          setPlan(tier);
+          onClose();
+        }, 500);
       }
     } finally {
       setPaying(false);
@@ -205,7 +255,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   };
 
   return (
-    <div className="checkout-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div
+      className="checkout-overlay"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
       <div className="checkout-modal">
         {/* Header */}
         <div className="checkout-header">
@@ -216,21 +269,32 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             <div>
               <h2 className="checkout-title">Upgrade to {tierLabel}</h2>
               <p className="checkout-sub">
-                {step === "summary" ? "Review what you'll get" : "Choose your payment method"}
+                {step === "summary"
+                  ? "Review what you'll get"
+                  : "Choose your payment method"}
               </p>
             </div>
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             {step === "method" && (
-              <button className="checkout-back-btn" onClick={() => setStep("summary")}>
+              <button
+                className="checkout-back-btn"
+                onClick={() => setStep("summary")}
+              >
                 ← Back
               </button>
             )}
             <div className="checkout-currency-toggle">
-              <button className={currency === "USD" ? "active" : ""} onClick={() => setCurrency("USD")}>
+              <button
+                className={currency === "USD" ? "active" : ""}
+                onClick={() => setCurrency("USD")}
+              >
                 $ USD
               </button>
-              <button className={currency === "INR" ? "active" : ""} onClick={() => setCurrency("INR")}>
+              <button
+                className={currency === "INR" ? "active" : ""}
+                onClick={() => setCurrency("INR")}
+              >
                 ₹ INR
               </button>
             </div>
@@ -245,8 +309,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             {/* Price */}
             <div className="checkout-price-row">
               <span className="checkout-price">{displayPrice}</span>
-              <span className="checkout-period">/{tier === "annual" ? "year" : "month"}</span>
-              {tier === "annual" && <span className="checkout-saving-pill">Save 29%</span>}
+              <span className="checkout-period">
+                /{tier === "annual" ? "year" : "month"}
+              </span>
+              {tier === "annual" && (
+                <span className="checkout-saving-pill">Save 29%</span>
+              )}
             </div>
 
             {/* Model access */}
@@ -257,10 +325,15 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               </div>
               <div className="checkout-model-grid">
                 {models.map((m) => (
-                  <div key={m.label} className={`checkout-model-pill ${m.tier}`}>
+                  <div
+                    key={m.label}
+                    className={`checkout-model-pill ${m.tier}`}
+                  >
                     <Check size={10} />
                     <span>{m.label}</span>
-                    {m.note && <span className="checkout-model-note">{m.note}</span>}
+                    {m.note && (
+                      <span className="checkout-model-note">{m.note}</span>
+                    )}
                   </div>
                 ))}
               </div>
@@ -275,38 +348,76 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               <ul className="checkout-features">
                 {tier === "pro" ? (
                   <>
-                    <li><Check size={12} className="co-check" /> Unlimited AI generations</li>
-                    <li><Check size={12} className="co-check" /> All models (GPT-4o, Claude 3.5, Gemini Pro)</li>
-                    <li><Check size={12} className="co-check" /> Unlimited workflow saves</li>
-                    <li><Check size={12} className="co-check" /> Export to Python / n8n / Zapier</li>
-                    <li><Check size={12} className="co-check" /> API access</li>
-                    <li><Check size={12} className="co-check" /> Priority support</li>
+                    <li>
+                      <Check size={12} className="co-check" /> Unlimited AI
+                      generations
+                    </li>
+                    <li>
+                      <Check size={12} className="co-check" /> All models
+                      (GPT-4o, Claude 3.5, Gemini Pro)
+                    </li>
+                    <li>
+                      <Check size={12} className="co-check" /> Unlimited
+                      workflow saves
+                    </li>
+                    <li>
+                      <Check size={12} className="co-check" /> Export to Python
+                      / n8n / Zapier
+                    </li>
+                    <li>
+                      <Check size={12} className="co-check" /> API access
+                    </li>
+                    <li>
+                      <Check size={12} className="co-check" /> Priority support
+                    </li>
                   </>
                 ) : (
                   <>
-                    <li><Check size={12} className="co-check" /> Everything in Pro</li>
-                    <li><Check size={12} className="co-check" /> Claude 3 Opus access</li>
-                    <li><Check size={12} className="co-check" /> Team collaboration (5 seats)</li>
-                    <li><Check size={12} className="co-check" /> RAG pipelines + vector DB</li>
-                    <li><Check size={12} className="co-check" /> Custom integrations</li>
-                    <li><Check size={12} className="co-check" /> Dedicated support</li>
+                    <li>
+                      <Check size={12} className="co-check" /> Everything in Pro
+                    </li>
+                    <li>
+                      <Check size={12} className="co-check" /> Claude 3 Opus
+                      access
+                    </li>
+                    <li>
+                      <Check size={12} className="co-check" /> Team
+                      collaboration (5 seats)
+                    </li>
+                    <li>
+                      <Check size={12} className="co-check" /> RAG pipelines +
+                      vector DB
+                    </li>
+                    <li>
+                      <Check size={12} className="co-check" /> Custom
+                      integrations
+                    </li>
+                    <li>
+                      <Check size={12} className="co-check" /> Dedicated support
+                    </li>
                   </>
                 )}
               </ul>
             </div>
 
-            <button className="checkout-cta-btn" onClick={() => setStep("method")}>
+            <button
+              className="checkout-cta-btn"
+              onClick={() => setStep("method")}
+            >
               Choose Payment Method
               <ChevronRight size={16} />
             </button>
             <p className="checkout-trust">
-              <Lock size={11} /> Secure checkout · Cancel anytime · 7-day money-back guarantee
+              <Lock size={11} /> Secure checkout · Cancel anytime · 7-day
+              money-back guarantee
             </p>
           </>
         ) : (
           /* Step 2: Payment methods */
           <div className="checkout-methods">
-            <p className="checkout-methods-hint">Select how you'd like to pay {displayPrice}:</p>
+            <p className="checkout-methods-hint">
+              Select how you'd like to pay {displayPrice}:
+            </p>
             <div className="checkout-methods-list">
               {availableMethods.map((m) => {
                 const hasLink = !!m.getLink?.(tier, currency);

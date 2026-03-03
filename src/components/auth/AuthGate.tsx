@@ -172,9 +172,9 @@ export const AuthGate: React.FC = () => {
         <div className="auth-loading-orb" />
         <div className="auth-loading-content">
           <div className="auth-loading-icon-wrap">
-            <img src={appIcon} alt="AuraFlow" className="auth-app-icon" />
+            <img src={appIcon} alt="AuraStudio" className="auth-app-icon" />
           </div>
-          <p className="auth-loading-title">AuraFlow</p>
+          <p className="auth-loading-title">AuraStudio</p>
           <p className="auth-loading-sub">Initializing workspace…</p>
         </div>
       </div>
@@ -196,7 +196,7 @@ export const AuthGate: React.FC = () => {
 
         {/* Icon */}
         <div className="auth-icon-ring">
-          <img src={appIcon} alt="AuraFlow" className="auth-icon-img" />
+          <img src={appIcon} alt="AuraStudio" className="auth-icon-img" />
         </div>
 
         <div className="auth-brand-row">

@@ -1,3 +1,4 @@
+import { GoogleGenAI } from "@google/genai";
 import {
   Bot,
   ChevronDown,
@@ -15,11 +16,26 @@ import {
 import React, { useEffect, useRef, useState } from "react";
 import { useStore } from "../../store";
 import type { PipelineEdge, PipelineNode } from "../../types";
+import "./AIPromptChat.css";
 
-// ── Gemini direct API ─────────────────────────────────────────────────────────
+// ── Gemini API ────────────────────────────────────────────────────────────────
 const GEMINI_KEY = import.meta.env.GEMINI_KEY ?? "";
-const GEMINI_MODEL = "gemini-1.5-flash";
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:streamGenerateContent?alt=sse&key=${GEMINI_KEY}`;
+const CHAT_MODEL_PRIMARY = "gemini-3-flash-preview";
+const CHAT_MODEL_FALLBACK = "gemini-2.5-flash";
+
+// Lazy-init so a missing key doesn't crash the module
+let _ai: GoogleGenAI | null = null;
+function getAI(): GoogleGenAI | null {
+  if (!GEMINI_KEY) return null;
+  if (!_ai) {
+    try {
+      _ai = new GoogleGenAI({ apiKey: GEMINI_KEY });
+    } catch {
+      return null;
+    }
+  }
+  return _ai;
+}
 
 const SYSTEM_PROMPT = `You are Aura, an expert AI workflow architect. You help users build visual AI pipelines using a node-based canvas.
 
@@ -48,57 +64,41 @@ interface GeminiMessage {
 }
 
 async function* streamGemini(history: GeminiMessage[]): AsyncGenerator<string> {
-  if (!GEMINI_KEY) {
-    yield "⚠️ No Gemini API key configured. Add GEMINI_KEY to your .env file.";
+  const client = getAI();
+  if (!client) {
+    yield "⚠️ No Gemini API key found. Add GEMINI_KEY to your .env file.";
     return;
   }
-
-  const response = await fetch(GEMINI_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
-      contents: history,
-      generationConfig: {
-        temperature: 0.7,
-        maxOutputTokens: 2048,
-      },
-    }),
-  });
-
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    const msg = (err as { error?: { message?: string } })?.error?.message;
-    yield `⚠️ Gemini error: ${msg ?? response.statusText}`;
-    return;
-  }
-
-  const reader = response.body?.getReader();
-  if (!reader) return;
-
-  const decoder = new TextDecoder();
-  let buffer = "";
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() ?? "";
-
-    for (const line of lines) {
-      if (!line.startsWith("data: ")) continue;
-      const data = line.slice(6).trim();
-      if (data === "[DONE]") return;
-      try {
-        const parsed = JSON.parse(data) as {
-          candidates?: { content?: { parts?: { text?: string }[] } }[];
-        };
-        const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) yield text;
-      } catch {
-        // skip malformed chunk
+  const contents = history.map((msg) => ({
+    role: msg.role,
+    parts: [{ text: msg.parts[0].text }],
+  }));
+  const cfg = {
+    systemInstruction: SYSTEM_PROMPT,
+    temperature: 0.7,
+    maxOutputTokens: 2048,
+  };
+  try {
+    const res = await client.models.generateContentStream({
+      model: CHAT_MODEL_PRIMARY,
+      contents,
+      config: cfg,
+    });
+    for await (const chunk of res) {
+      if (chunk.text) yield chunk.text;
+    }
+  } catch {
+    try {
+      const res2 = await client.models.generateContentStream({
+        model: CHAT_MODEL_FALLBACK,
+        contents,
+        config: cfg,
+      });
+      for await (const chunk of res2) {
+        if (chunk.text) yield chunk.text;
       }
+    } catch (e) {
+      yield `⚠️ Error: ${e instanceof Error ? e.message : "Unknown error"}`;
     }
   }
 }
@@ -114,7 +114,7 @@ interface ChatMessage {
   timestamp: string;
 }
 
-// ── Simple markdown renderer ──────────────────────────────────────────────────
+// ── Markdown renderer ─────────────────────────────────────────────────────────
 function renderMd(text: string): string {
   return text
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
@@ -122,7 +122,7 @@ function renderMd(text: string): string {
     .replace(/\n/g, "<br/>");
 }
 
-// ── Task List Plan Viewer ─────────────────────────────────────────────────────
+// ── Task Plan viewer ──────────────────────────────────────────────────────────
 const TaskListView: React.FC<{
   taskList: string;
   onConfirm: () => void;
@@ -132,42 +132,40 @@ const TaskListView: React.FC<{
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(taskList);
   const [collapsed, setCollapsed] = useState(false);
+  const stepCount = (taskList.match(/^\d+\./gm) ?? []).length;
 
   return (
-    <div className="task-list-view">
-      <div className="task-list-header" onClick={() => setCollapsed((v) => !v)}>
-        <span className="task-list-title">
-          <GitBranch size={12} />
+    <div className="aura-task-panel">
+      <button
+        className="aura-task-toggle"
+        onClick={() => setCollapsed((v) => !v)}
+      >
+        <span className="aura-task-toggle-label">
+          <GitBranch size={11} />
           Task Plan
         </span>
-        {collapsed ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
-      </div>
+        <span className="aura-task-toggle-steps">
+          {stepCount} steps
+          {collapsed ? <ChevronDown size={11} /> : <ChevronUp size={11} />}
+        </span>
+      </button>
 
       {!collapsed && (
-        <>
+        <div className="aura-task-body">
           {editing ? (
             <textarea
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              className="task-list-editor"
+              className="aura-task-editor"
             />
           ) : (
-            <pre className="task-list-content">{taskList}</pre>
+            <pre className="aura-task-content">{taskList}</pre>
           )}
-          <div className="task-list-actions">
+          <div className="aura-task-actions">
             {editing ? (
               <>
                 <button
-                  className="tl-btn tl-btn-primary"
-                  onClick={() => {
-                    onEdit(draft);
-                    setEditing(false);
-                  }}
-                >
-                  Apply
-                </button>
-                <button
-                  className="tl-btn"
+                  className="aura-btn aura-btn-ghost"
                   onClick={() => {
                     setDraft(taskList);
                     setEditing(false);
@@ -175,46 +173,64 @@ const TaskListView: React.FC<{
                 >
                   Cancel
                 </button>
+                <button
+                  className="aura-btn aura-btn-primary"
+                  onClick={() => {
+                    onEdit(draft);
+                    setEditing(false);
+                  }}
+                >
+                  Apply
+                </button>
               </>
             ) : (
               <>
-                <button className="tl-btn" onClick={() => setEditing(true)}>
-                  Edit Plan
+                <button
+                  className="aura-btn aura-btn-ghost"
+                  onClick={() => setEditing(true)}
+                >
+                  Edit
                 </button>
                 <button
-                  className="tl-btn tl-btn-primary"
+                  className="aura-btn aura-btn-glow"
                   onClick={onConfirm}
                   disabled={loading}
-                  style={{ flex: 2 }}
                 >
                   {loading ? (
-                    <Loader2 size={11} className="spin-icon" />
+                    <>
+                      <Loader2 size={12} className="aura-spin" /> Building…
+                    </>
                   ) : (
-                    <Wand2 size={11} />
+                    <>
+                      <Wand2 size={12} /> Generate Workflow
+                    </>
                   )}
-                  {loading ? "Building…" : "Generate Workflow ✨"}
                 </button>
               </>
             )}
           </div>
-        </>
+        </div>
       )}
     </div>
   );
 };
 
-// ── Main Component ────────────────────────────────────────────────────────────
-interface Props {
-  embedded?: boolean;
-}
+// ── Typing cursor ─────────────────────────────────────────────────────────────
+const StreamCursor = () => <span className="aura-cursor" aria-hidden />;
 
+// ── Welcome message ───────────────────────────────────────────────────────────
 const WELCOME: ChatMessage = {
   id: "welcome",
   role: "assistant",
   content:
-    "Hi! I'm **Aura**, your AI workflow architect.\n\nDescribe any automation, AI pipeline, or workflow you want to build — I'll design it for you as a visual node graph.",
+    "Hi! I'm **Aura**, your AI workflow architect.\n\nDescribe any automation, AI pipeline, or workflow — I'll design it as a visual node graph.",
   timestamp: new Date().toISOString(),
 };
+
+// ── Main component ────────────────────────────────────────────────────────────
+interface Props {
+  embedded?: boolean;
+}
 
 export const AIPromptChat: React.FC<Props> = ({ embedded }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME]);
@@ -227,10 +243,10 @@ export const AIPromptChat: React.FC<Props> = ({ embedded }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const applyGeneratedGraph = useStore((s) => s.applyGeneratedGraph);
   const consumeCredit = useStore((s) => s.consumeCredit);
-  const plan = useStore((s) => s.plan);
   const user = useStore((s) => s.user);
 
   // Auto-scroll
@@ -238,7 +254,14 @@ export const AIPromptChat: React.FC<Props> = ({ embedded }) => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streaming]);
 
-  // Build Gemini history from messages
+  // Auto-resize textarea
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 120) + "px";
+  }, [input]);
+
   const buildHistory = (): GeminiMessage[] =>
     messages
       .filter((m) => m.id !== "welcome" && !m.isStreaming)
@@ -247,10 +270,11 @@ export const AIPromptChat: React.FC<Props> = ({ embedded }) => {
         parts: [{ text: m.content }],
       }));
 
+  // ── Send ──────────────────────────────────────────────────────────────────
   const handleSend = async () => {
     const text = input.trim();
     if (!text || streaming) return;
-    // Credit gate for free plan
+
     if (!consumeCredit()) {
       setMessages((prev) => [
         ...prev,
@@ -265,22 +289,23 @@ export const AIPromptChat: React.FC<Props> = ({ embedded }) => {
       return;
     }
 
-    const userMsg: ChatMessage = {
-      id: `u-${Date.now()}`,
-      role: "user",
-      content: text,
-      timestamp: new Date().toISOString(),
-    };
     const botId = `a-${Date.now()}`;
-    const botMsg: ChatMessage = {
-      id: botId,
-      role: "assistant",
-      content: "",
-      isStreaming: true,
-      timestamp: new Date().toISOString(),
-    };
-
-    setMessages((prev) => [...prev, userMsg, botMsg]);
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: `u-${Date.now()}`,
+        role: "user",
+        content: text,
+        timestamp: new Date().toISOString(),
+      },
+      {
+        id: botId,
+        role: "assistant",
+        content: "",
+        isStreaming: true,
+        timestamp: new Date().toISOString(),
+      },
+    ]);
     setInput("");
     setStreaming(true);
 
@@ -296,7 +321,6 @@ export const AIPromptChat: React.FC<Props> = ({ embedded }) => {
         );
       }
 
-      // Finalize: detect if there's a task plan (numbered list)
       const hasTaskPlan = /^\d+\./m.test(fullText);
       setMessages((prev) =>
         prev.map((m) =>
@@ -311,11 +335,14 @@ export const AIPromptChat: React.FC<Props> = ({ embedded }) => {
       );
       if (hasTaskPlan) setPendingTaskList(fullText);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Something went wrong.";
       setMessages((prev) =>
         prev.map((m) =>
           m.id === botId
-            ? { ...m, content: `⚠️ ${msg}`, isStreaming: false }
+            ? {
+                ...m,
+                content: `⚠️ ${err instanceof Error ? err.message : "Something went wrong."}`,
+                isStreaming: false,
+              }
             : m,
         ),
       );
@@ -324,22 +351,31 @@ export const AIPromptChat: React.FC<Props> = ({ embedded }) => {
     }
   };
 
+  // ── Generate graph ────────────────────────────────────────────────────────
   const handleGenerateGraph = async (taskList: string) => {
     setBuildingGraph(true);
     const botId = `graph-gen-${Date.now()}`;
-    const botMsg: ChatMessage = {
-      id: botId,
-      role: "assistant",
-      content: "",
-      isStreaming: true,
-      timestamp: new Date().toISOString(),
-    };
-    setMessages((prev) => [...prev, botMsg]);
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: botId,
+        role: "assistant",
+        content: "",
+        isStreaming: true,
+        timestamp: new Date().toISOString(),
+      },
+    ]);
 
     try {
-      const prompt = `Generate a workflow JSON for this task plan:\n\n${taskList}\n\nRespond ONLY with the JSON object, no markdown fences.`;
       const history: GeminiMessage[] = [
-        { role: "user", parts: [{ text: prompt }] },
+        {
+          role: "user",
+          parts: [
+            {
+              text: `Generate a workflow JSON for this task plan:\n\n${taskList}\n\nRespond ONLY with the JSON object, no markdown fences.`,
+            },
+          ],
+        },
       ];
 
       let raw = "";
@@ -350,7 +386,6 @@ export const AIPromptChat: React.FC<Props> = ({ embedded }) => {
         );
       }
 
-      // Extract JSON
       const jsonMatch = raw.match(/\{[\s\S]*\}/);
       if (!jsonMatch) throw new Error("No valid JSON in response.");
 
@@ -366,7 +401,7 @@ export const AIPromptChat: React.FC<Props> = ({ embedded }) => {
           m.id === botId
             ? {
                 ...m,
-                content: `✅ Workflow created with **${parsed.nodes.length} nodes** and **${parsed.edges.length} connections**! Check the canvas →`,
+                content: `✅ Workflow ready — **${parsed.nodes.length} nodes**, **${parsed.edges.length} connections**. Check the canvas →`,
                 isStreaming: false,
                 graphGenerated: true,
               }
@@ -374,12 +409,14 @@ export const AIPromptChat: React.FC<Props> = ({ embedded }) => {
         ),
       );
     } catch (err) {
-      const msg =
-        err instanceof Error ? err.message : "Graph generation failed";
       setMessages((prev) =>
         prev.map((m) =>
           m.id === botId
-            ? { ...m, content: `⚠️ ${msg}`, isStreaming: false }
+            ? {
+                ...m,
+                content: `⚠️ ${err instanceof Error ? err.message : "Graph generation failed"}`,
+                isStreaming: false,
+              }
             : m,
         ),
       );
@@ -388,6 +425,7 @@ export const AIPromptChat: React.FC<Props> = ({ embedded }) => {
     }
   };
 
+  // ── Voice ─────────────────────────────────────────────────────────────────
   const toggleVoice = () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const w = window as any;
@@ -406,7 +444,7 @@ export const AIPromptChat: React.FC<Props> = ({ embedded }) => {
     rec.onresult = (e: any) => {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       const t = e.results[0][0].transcript as string;
-      setInput((prev) => (prev ? `${prev} ${t}` : t));
+      setInput((p) => (p ? `${p} ${t}` : t));
     };
     rec.onend = () => setRecording(false);
     rec.start();
@@ -428,51 +466,67 @@ export const AIPromptChat: React.FC<Props> = ({ embedded }) => {
     !lastMsg.isStreaming;
 
   const hasVoice =
-    (typeof window !== "undefined" &&
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      !!(window as any).SpeechRecognition) ||
-    !!(window as any).webkitSpeechRecognition;
+    typeof window !== "undefined" &&
+    !!(
+      (window as any).SpeechRecognition ||
+      (window as any).webkitSpeechRecognition
+    );
 
   return (
-    <div className={`ai-chat-container${embedded ? " embedded" : ""}`}>
-      {/* Header */}
+    <div className={`aura-chat${embedded ? " aura-chat--embedded" : ""}`}>
+      {/* ── Header ─────────────────────────────────────────────────────── */}
       {!embedded && (
-        <div className="ai-chat-header">
-          <Sparkles size={14} />
-          <span className="ai-chat-header-title">Aura Assistant</span>
+        <div className="aura-header">
+          <div className="aura-header-left">
+            <div className="aura-header-icon">
+              <Sparkles size={13} />
+            </div>
+            <div>
+              <div className="aura-header-title">Aura</div>
+              <div className="aura-header-sub">Workflow Architect</div>
+            </div>
+          </div>
           {user?.name && (
-            <span className="ai-chat-header-user">
-              {user.name.split(" ")[0]}
-            </span>
+            <div className="aura-header-user">{user.name.split(" ")[0]}</div>
           )}
         </div>
       )}
 
-      {/* Messages */}
-      <div className="ai-chat-messages">
+      {/* ── Messages ───────────────────────────────────────────────────── */}
+      <div className="aura-messages">
         {messages.map((msg) => (
-          <div key={msg.id} className={`chat-msg-row ${msg.role}`}>
-            <div className={`chat-avatar ${msg.role}`}>
-              {msg.role === "assistant" ? (
-                <Bot size={13} />
-              ) : (
-                <UserIcon size={13} />
-              )}
-            </div>
+          <div key={msg.id} className={`aura-msg aura-msg--${msg.role}`}>
+            {msg.role === "assistant" && (
+              <div className="aura-avatar aura-avatar--bot">
+                <Bot size={12} />
+              </div>
+            )}
+
             <div
-              className={`chat-bubble ${msg.role}${msg.graphGenerated ? " graph-ok" : ""}${msg.isStreaming ? " streaming" : ""}`}
-              dangerouslySetInnerHTML={{ __html: renderMd(msg.content) }}
-            />
+              className={`aura-bubble aura-bubble--${msg.role}${msg.graphGenerated ? " aura-bubble--success" : ""}`}
+            >
+              <div
+                className="aura-bubble-text"
+                dangerouslySetInnerHTML={{ __html: renderMd(msg.content) }}
+              />
+              {msg.isStreaming && <StreamCursor />}
+            </div>
+
+            {msg.role === "user" && (
+              <div className="aura-avatar aura-avatar--user">
+                <UserIcon size={12} />
+              </div>
+            )}
           </div>
         ))}
 
         {showTaskList && (
-          <div className="task-list-wrap">
+          <div className="aura-task-wrap">
             <TaskListView
               taskList={pendingTaskList!}
               loading={buildingGraph}
               onConfirm={() => void handleGenerateGraph(pendingTaskList!)}
-              onEdit={(updated) => setPendingTaskList(updated)}
+              onEdit={(u) => setPendingTaskList(u)}
             />
           </div>
         )}
@@ -480,12 +534,19 @@ export const AIPromptChat: React.FC<Props> = ({ embedded }) => {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input area */}
-      <div className="ai-chat-input-area">
-        <div className="ai-chat-input-row">
+      {/* ── Input ──────────────────────────────────────────────────────── */}
+      <div className="aura-input-area">
+        {!GEMINI_KEY && (
+          <div className="aura-key-warning">
+            <span>⚠️</span> Add <code>GEMINI_KEY</code> to <code>.env</code>
+          </div>
+        )}
+
+        <div className="aura-input-shell">
           <textarea
-            className="ai-chat-input"
-            placeholder="Describe a workflow… (Enter to send)"
+            ref={textareaRef}
+            className="aura-input"
+            placeholder="Describe your workflow…"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
@@ -494,45 +555,45 @@ export const AIPromptChat: React.FC<Props> = ({ embedded }) => {
                 void handleSend();
               }
             }}
-            rows={2}
+            rows={1}
             disabled={streaming}
           />
-          <div className="ai-chat-input-btns">
+
+          <div className="aura-input-actions">
             {hasVoice && (
               <button
-                className={`chat-icon-btn${recording ? " recording" : ""}`}
+                className={`aura-icon-btn${recording ? " aura-icon-btn--active" : ""}`}
                 onClick={toggleVoice}
                 title={recording ? "Stop recording" : "Voice input"}
               >
-                {recording ? <MicOff size={14} /> : <Mic size={14} />}
+                {recording ? <MicOff size={13} /> : <Mic size={13} />}
               </button>
             )}
             <button
-              className="chat-icon-btn danger"
+              className="aura-icon-btn aura-icon-btn--danger"
               onClick={clearChat}
               title="Clear chat"
             >
-              <Trash2 size={14} />
+              <Trash2 size={13} />
             </button>
             <button
-              className="chat-send-btn"
+              className="aura-send-btn"
               onClick={() => void handleSend()}
               disabled={!input.trim() || streaming}
               title="Send"
             >
               {streaming ? (
-                <Loader2 size={15} className="spin-icon" />
+                <Loader2 size={14} className="aura-spin" />
               ) : (
-                <Send size={15} />
+                <Send size={14} />
               )}
             </button>
           </div>
         </div>
-        {!GEMINI_KEY && (
-          <p className="chat-no-key-warning">
-            ⚠️ Add GEMINI_KEY to .env to enable AI chat
-          </p>
-        )}
+
+        <div className="aura-input-hint">
+          Enter to send · Shift+Enter for newline
+        </div>
       </div>
     </div>
   );

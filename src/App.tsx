@@ -23,9 +23,9 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
         <div className="auth-loading-orb" />
         <div className="auth-loading-content">
           <div className="auth-loading-icon-wrap">
-            <img src={appIcon} alt="AuraFlow" className="auth-app-icon" />
+            <img src={appIcon} alt="AuraStudio" className="auth-app-icon" />
           </div>
-          <p className="auth-loading-title">AuraFlow</p>
+          <p className="auth-loading-title">AuraStudio</p>
           <p className="auth-loading-sub">Initializing workspace…</p>
         </div>
       </div>

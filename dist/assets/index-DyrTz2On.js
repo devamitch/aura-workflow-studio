@@ -19862,13 +19862,13 @@ const Df = () => "http://localhost:8000",
                     className: "auth-loading-icon-wrap",
                     children: u.jsx("img", {
                       src: Zl,
-                      alt: "AuraFlow icon",
+                      alt: "AuraStudio icon",
                       className: "auth-app-icon",
                     }),
                   }),
                   u.jsx("p", {
                     className: "auth-loading-title",
-                    children: "AuraFlow",
+                    children: "AuraStudio",
                   }),
                   u.jsx("p", {
                     className: "auth-loading-sub",
@@ -19898,7 +19898,7 @@ const Df = () => "http://localhost:8000",
                             className: "auth-logo-icon",
                             children: u.jsx("img", {
                               src: Zl,
-                              alt: "AuraFlow icon",
+                              alt: "AuraStudio icon",
                               className: "auth-logo-icon-img",
                             }),
                           }),
@@ -19919,7 +19919,7 @@ const Df = () => "http://localhost:8000",
                         className: "auth-banner-wrap",
                         children: u.jsx("img", {
                           src: uE,
-                          alt: "AuraFlow banner",
+                          alt: "AuraStudio banner",
                           className: "auth-banner-img",
                         }),
                       }),
@@ -19990,7 +19990,7 @@ const Df = () => "http://localhost:8000",
                             children: [
                               "Join ",
                               u.jsx("strong", { children: "2,400+" }),
-                              " builders already using AuraFlow",
+                              " builders already using AuraStudio",
                             ],
                           }),
                         ],
@@ -20011,11 +20011,11 @@ const Df = () => "http://localhost:8000",
                             className: "auth-card-icon",
                             children: u.jsx("img", {
                               src: Zl,
-                              alt: "AuraFlow icon",
+                              alt: "AuraStudio icon",
                               className: "auth-card-icon-img",
                             }),
                           }),
-                          u.jsx("span", { children: "AuraFlow" }),
+                          u.jsx("span", { children: "AuraStudio" }),
                         ],
                       }),
                       u.jsx("h2", {
@@ -22325,7 +22325,7 @@ function z_(e, t, n, r) {
         key: "rzp_test_placeholder",
         amount: e * 100,
         currency: t,
-        name: "AuraFlow",
+        name: "AuraStudio",
         description: n,
         handler: r,
         theme: { color: "#6366f1" },
@@ -22382,9 +22382,14 @@ const I_ = ({
               }, 500));
           } else
             h.id === "razorpay-link" || h.id === "razorpay"
-              ? z_(x, i === "INR" ? "INR" : "USD", `AuraFlow ${g} Plan`, () => {
-                  (o(), f(e), r());
-                })
+              ? z_(
+                  x,
+                  i === "INR" ? "INR" : "USD",
+                  `AuraStudio ${g} Plan`,
+                  () => {
+                    (o(), f(e), r());
+                  },
+                )
               : h.id === "payu"
                 ? (alert(`PayU payment for ${p}.
 Add VITE_PAYU_MERCHANT_KEY and backend for live PayU payments.
@@ -22849,7 +22854,7 @@ function Oi(e, t, n, r) {
           key: "rzp_test_placeholder",
           amount: o * 100,
           currency: n === "INR" ? "INR" : "USD",
-          name: "AuraFlow Credits",
+          name: "AuraStudio Credits",
           description: `${e.credits} AI Credits`,
           handler: i,
           theme: { color: "#6366f1" },
@@ -22899,7 +22904,7 @@ const L_ = ({ onClose: e, defaultTab: t = "plans" }) => {
                         children: [
                           u.jsx("h2", {
                             className: "pricing-title",
-                            children: "Upgrade AuraFlow",
+                            children: "Upgrade AuraStudio",
                           }),
                           u.jsx("p", {
                             className: "pricing-sub",
@@ -23185,7 +23190,7 @@ const L_ = ({ onClose: e, defaultTab: t = "plans" }) => {
           D = URL.createObjectURL(I),
           A = document.createElement("a");
         ((A.href = D),
-          (A.download = `auraflow-${new Date().toISOString().slice(0, 10)}.json`),
+          (A.download = `AuraStudio-${new Date().toISOString().slice(0, 10)}.json`),
           A.click(),
           URL.revokeObjectURL(D));
       },
@@ -23231,7 +23236,7 @@ const L_ = ({ onClose: e, defaultTab: t = "plans" }) => {
                   },
                   children: u.jsx("img", {
                     src: "/app-icon.png",
-                    alt: "AuraFlow",
+                    alt: "AuraStudio",
                     style: {
                       width: "100%",
                       height: "100%",

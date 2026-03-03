@@ -66,7 +66,7 @@ export const Header: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `auraflow-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `AuraStudio-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -105,7 +105,7 @@ export const Header: React.FC = () => {
           >
             <img
               src="/app-icon.png"
-              alt="AuraFlow"
+              alt="AuraStudio"
               style={{
                 width: "100%",
                 height: "100%",
@@ -115,7 +115,7 @@ export const Header: React.FC = () => {
             />
           </div>
           <span className="header-logo-text">
-            Aura<span>Flow</span>
+            Aura <span>Studio</span>
           </span>
           <span className="header-badge">BETA</span>
         </div>

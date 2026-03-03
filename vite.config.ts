@@ -13,8 +13,10 @@ export default defineConfig(({ mode }) => {
       "import.meta.env.VITE_API_URL": JSON.stringify(
         env.VITE_API_URL || "http://localhost:8000",
       ),
+
+      "import.meta.env.GEMINI_KEY": JSON.stringify(env.GEMINI_KEY || ""),
     },
-    envPrefix: ["VITE_", "GOOGLE_CLIENT_ID"],
+    envPrefix: ["VITE_", "GOOGLE_CLIENT_ID", "GEMINI_KEY"],
     plugins: [
       react(),
       VitePWA({

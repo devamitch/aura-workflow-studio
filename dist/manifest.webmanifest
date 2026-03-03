@@ -1,6 +1,6 @@
 {
-  "name": "AuraFlow — Visual AI Workflow Studio",
-  "short_name": "AuraFlow",
+  "name": "AuraStudio — Visual AI Workflow Studio",
+  "short_name": "AuraStudio",
   "description": "Build, visualize and run AI pipelines visually. No-code LLM orchestration with GPT-4o, Claude, Gemini and more.",
   "start_url": "/",
   "display": "standalone",
@@ -44,7 +44,7 @@
       "sizes": "1200x630",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "AuraFlow Canvas"
+      "label": "AuraStudio Canvas"
     }
   ],
   "shortcuts": [
