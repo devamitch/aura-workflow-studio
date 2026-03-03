@@ -1,3 +1,4 @@
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ChevronDown,
   Crown,
@@ -16,15 +17,15 @@ import {
   Wand2,
   Zap,
 } from "lucide-react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { shallow } from "zustand/shallow";
 import { AUTH_ME_QUERY_KEY } from "../../hooks/useAuthMeSync";
 import { useStore } from "../../store";
 import { WorkflowsModal } from "../sidebar/WorkflowsModal";
 import { PricingModal } from "../ui/PricingModal";
 
-export const Header: React.FC = () => {
+export const Header: React.FC = ({ showMenu }: { showMenu?: boolean }) => {
   const [showWorkflowsModal, setShowWorkflowsModal] = useState(false);
   const [savePrompt, setSavePrompt] = useState(false);
   const [saveName, setSaveName] = useState("");
@@ -32,6 +33,7 @@ export const Header: React.FC = () => {
   const saveInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const {
     theme,
@@ -44,8 +46,6 @@ export const Header: React.FC = () => {
     exportToJSON,
     importFromJSON,
     applyAutoLayout,
-    nodes,
-    edges,
     plan,
     showPricingModal,
     pricingTab,
@@ -66,8 +66,6 @@ export const Header: React.FC = () => {
       exportToJSON: s.exportToJSON,
       importFromJSON: s.importFromJSON,
       applyAutoLayout: s.applyAutoLayout,
-      nodes: s.nodes,
-      edges: s.edges,
       plan: s.plan,
       showPricingModal: s.showPricingModal,
       pricingTab: s.pricingTab,
@@ -128,6 +126,33 @@ export const Header: React.FC = () => {
   const displayName =
     user?.name?.split(" ")[0] ?? user?.email?.split("@")[0] ?? "User";
 
+  // ── Keyboard shortcuts ────────────────────────────────────────────────────
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (["INPUT", "TEXTAREA", "SELECT"].includes(tag)) return;
+      const isMac =
+        /mac/i.test(navigator.userAgent) &&
+        !/iphone|ipad/i.test(navigator.userAgent);
+      const cmd = isMac ? e.metaKey : e.ctrlKey;
+      if (!cmd) return;
+
+      if (e.key.toLowerCase() === "n") {
+        e.preventDefault();
+        clearCanvas();
+      } else if (e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        setSavePrompt(true);
+        setTimeout(() => saveInputRef.current?.focus(), 50);
+      } else if (e.key.toLowerCase() === "o") {
+        e.preventDefault();
+        setShowWorkflowsModal(true);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [clearCanvas, setShowWorkflowsModal]);
+
   return (
     <>
       <header className="app-header">
@@ -152,162 +177,161 @@ export const Header: React.FC = () => {
         </div>
 
         {/* Center actions */}
-        <div className="header-actions">
-          {/* Prompt-to-canvas */}
-          <button
-            className="header-btn header-btn-magic"
-            onClick={() => setShowIntentOrchestrator(true)}
-            title="Build workflow from prompt"
-          >
-            <Wand2 size={14} />
-            <span>Build with AI</span>
-          </button>
+        {showMenu ? (
+          <div className="header-actions">
+            {/* Primary CTA — keep label */}
+            <button
+              className="header-btn header-btn-magic"
+              onClick={() => setShowIntentOrchestrator(true)}
+              data-tooltip="Generate workflow from a prompt"
+            >
+              <Wand2 size={14} />
+              <span>Build with AI</span>
+            </button>
 
-          <div className="header-divider" />
+            <div className="header-divider" />
 
-          <button
-            className="header-btn"
-            onClick={clearCanvas}
-            title="New Workflow"
-          >
-            <FilePlus size={14} />
-            <span>New</span>
-          </button>
+            {/* File group — icon only */}
+            <button
+              className="header-btn"
+              onClick={clearCanvas}
+              data-tooltip="New workflow · Ctrl+N"
+            >
+              <FilePlus size={14} />
+            </button>
 
-          {savePrompt ? (
-            <div className="header-save-row">
-              <input
-                ref={saveInputRef}
-                className="header-save-input"
-                placeholder="Workflow name…"
-                value={saveName}
-                autoFocus
-                onChange={(e) => setSaveName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleSaveConfirm();
-                  if (e.key === "Escape") {
+            {savePrompt ? (
+              <div className="header-save-row">
+                <input
+                  ref={saveInputRef}
+                  className="header-save-input"
+                  placeholder="Workflow name…"
+                  value={saveName}
+                  autoFocus
+                  onChange={(e) => setSaveName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleSaveConfirm();
+                    if (e.key === "Escape") {
+                      setSavePrompt(false);
+                      setSaveName("");
+                    }
+                  }}
+                />
+                <button
+                  className="header-btn header-btn-primary"
+                  onClick={handleSaveConfirm}
+                >
+                  Save
+                </button>
+                <button
+                  className="header-btn"
+                  onClick={() => {
                     setSavePrompt(false);
                     setSaveName("");
-                  }
-                }}
-              />
-              <button
-                className="header-btn header-btn-primary"
-                onClick={handleSaveConfirm}
-              >
-                Save
-              </button>
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+            ) : (
               <button
                 className="header-btn"
                 onClick={() => {
-                  setSavePrompt(false);
-                  setSaveName("");
+                  setSavePrompt(true);
+                  setTimeout(() => saveInputRef.current?.focus(), 50);
                 }}
+                data-tooltip="Save workflow · Ctrl+S"
               >
-                ✕
+                <Save size={14} />
               </button>
-            </div>
-          ) : (
+            )}
+
             <button
               className="header-btn"
-              onClick={() => {
-                setSavePrompt(true);
-                setTimeout(() => saveInputRef.current?.focus(), 50);
-              }}
-              title="Save Workflow"
+              onClick={() => setShowWorkflowsModal(true)}
+              data-tooltip="Open saved workflows · Ctrl+O"
             >
-              <Save size={14} />
-              <span>Save</span>
+              <FolderOpen size={14} />
             </button>
-          )}
 
-          <button
-            className="header-btn"
-            onClick={() => setShowWorkflowsModal(true)}
-            title="Open"
-          >
-            <FolderOpen size={14} />
-            <span>Open</span>
-          </button>
+            <div className="header-divider" />
 
-          <div className="header-divider" />
+            {/* Canvas tools — icon only */}
+            <button
+              className="header-btn"
+              onClick={loadDemo}
+              data-tooltip="Load demo workflow"
+            >
+              <PlayCircle size={14} />
+            </button>
+            <button
+              className="header-btn"
+              onClick={applyAutoLayout}
+              data-tooltip="Auto-layout (Dagre)"
+            >
+              <LayoutDashboard size={14} />
+            </button>
+            <button
+              className="header-btn"
+              onClick={() => setShowVersionHistory(true)}
+              data-tooltip="Version history"
+            >
+              <GitBranch size={14} />
+            </button>
 
-          <button className="header-btn" onClick={loadDemo} title="Load Demo">
-            <PlayCircle size={14} />
-            <span>Demo</span>
-          </button>
-          <button
-            className="header-btn"
-            onClick={applyAutoLayout}
-            title="Auto Layout (Dagre)"
-          >
-            <LayoutDashboard size={14} />
-            <span>Layout</span>
-          </button>
-          <button
-            className="header-btn"
-            onClick={() => setShowVersionHistory(true)}
-            title="Version History"
-          >
-            <GitBranch size={14} />
-            <span>History</span>
-          </button>
-          <button
-            className="header-btn"
-            onClick={handleExportJSON}
-            title="Export JSON"
-          >
-            <Download size={14} />
-            <span>JSON</span>
-          </button>
-          <button
-            className="header-btn"
-            onClick={() => fileInputRef.current?.click()}
-            title="Import JSON"
-          >
-            <Upload size={14} />
-            <span>Import</span>
-          </button>
+            <div className="header-divider" />
 
-          <div className="header-divider" />
+            {/* Import / Export JSON — icon only */}
+            <button
+              className="header-btn"
+              onClick={handleExportJSON}
+              data-tooltip="Export JSON"
+            >
+              <Download size={14} />
+            </button>
+            <button
+              className="header-btn"
+              onClick={() => fileInputRef.current?.click()}
+              data-tooltip="Import JSON"
+            >
+              <Upload size={14} />
+            </button>
 
-          {/* Run simulation */}
-          <button
-            className="header-btn header-btn-run"
-            onClick={() => setShowExecutionPanel(true)}
-            title="Run Simulation"
-          >
-            <Zap size={14} />
-            <span>Run</span>
-          </button>
+            <div className="header-divider" />
 
-          {/* Export ZIP */}
-          <button
-            className="header-btn header-btn-export"
-            onClick={() => setShowExportModal(true)}
-            title="Export Project ZIP"
-          >
-            <Download size={14} />
-            <span>Export ZIP</span>
-          </button>
-        </div>
+            {/* Primary actions — keep labels */}
+            <button
+              className="header-btn header-btn-run"
+              onClick={() => setShowExecutionPanel(true)}
+              data-tooltip="Simulate workflow execution"
+            >
+              <Zap size={14} />
+              <span>Run</span>
+            </button>
+            <button
+              className="header-btn header-btn-export"
+              onClick={() => setShowExportModal(true)}
+              data-tooltip="Export deployable project ZIP"
+            >
+              <Download size={14} />
+              <span>Export</span>
+            </button>
+          </div>
+        ) : (
+          <div className="header-actions"></div>
+        )}
 
         {/* Right */}
         <div className="header-right">
-          <div className="header-stats">
-            <span className="header-stat-chip">{nodes.length} nodes</span>
-            <span className="header-stat-chip">{edges.length} edges</span>
-          </div>
-
           {plan.tier === "free" && creditsLeft !== null && (
             <button
               className={`header-credits-bar${creditsLeft === 0 ? " depleted" : ""}`}
               onClick={() => setShowPricingModal(true, "credits")}
-              title="Buy more credits"
+              data-tooltip="Buy more credits"
             >
               <Zap size={11} />
               <span>
-                {creditsLeft} / {plan.creditsTotal} credits
+                {creditsLeft} / {plan.creditsTotal}
               </span>
               <div className="header-credits-track">
                 <div
@@ -328,7 +352,9 @@ export const Header: React.FC = () => {
           <button
             className="header-icon-btn"
             onClick={toggleTheme}
-            title="Toggle theme"
+            data-tooltip={
+              theme === "dark" ? "Switch to light mode" : "Switch to dark mode"
+            }
           >
             {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
           </button>
@@ -336,7 +362,7 @@ export const Header: React.FC = () => {
           <button
             className="header-upgrade-btn"
             onClick={() => setShowPricingModal(true, "plans")}
-            title="Upgrade"
+            data-tooltip="View pricing plans"
           >
             <Crown size={13} />
             <span>{plan.tier === "free" ? "Upgrade" : "Plans"}</span>
@@ -392,7 +418,13 @@ export const Header: React.FC = () => {
                     <Crown size={13} />
                     Upgrade Plan
                   </button>
-                  <button className="header-dropdown-item">
+                  <button
+                    className="header-dropdown-item"
+                    onClick={() => {
+                      setShowUserMenu(false);
+                      navigate("/settings");
+                    }}
+                  >
                     <Settings size={13} />
                     Settings
                   </button>

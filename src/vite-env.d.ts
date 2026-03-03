@@ -3,6 +3,7 @@
 interface ImportMetaEnv {
   readonly VITE_API_URL?: string;
   readonly GOOGLE_CLIENT_ID?: string;
+  readonly VITE_GEMINI_KEY?: string;
   readonly GEMINI_KEY?: string;
   readonly VITE_STRIPE_PUBLISHABLE_KEY?: string;
 }

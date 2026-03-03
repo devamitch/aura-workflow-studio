@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import React, { useState } from "react";
 import { useReactFlow } from "reactflow";
+import { getApiBaseUrl } from "../../lib/runtime-config";
 import { useStore } from "../../store";
 import type { ParseResponse } from "../../types";
 import { AlertModal } from "./AlertModal";
@@ -36,8 +37,7 @@ export const IntegratedBottomBar: React.FC<Props> = ({ onToggleChat, chatOpen })
     if (loading) return;
     setLoading(true);
     try {
-      const apiUrl = (import.meta.env.VITE_API_URL as string) || "http://localhost:8000";
-      const response = await fetch(`${apiUrl}/pipelines/parse`, {
+      const response = await fetch(`${getApiBaseUrl()}/pipelines/parse`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ nodes, edges }),

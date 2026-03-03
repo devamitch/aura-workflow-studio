@@ -2,23 +2,25 @@ import { GoogleOAuthProvider } from "@react-oauth/google";
 import React, { useEffect, useState } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { ReactFlowProvider } from "reactflow";
+import { shallow } from "zustand/shallow";
 import appIcon from "./assets/app-icon.png";
 import authBanner from "./assets/auth-banner.png";
 import { AuthGate } from "./components/auth/AuthGate";
 import { PipelineUI } from "./components/canvas/PipelineUI";
 import { Header } from "./components/layout/Header";
 import { RightChatPanel } from "./components/layout/RightChatPanel";
-import { IntentOrchestrator } from "./components/modals/IntentOrchestrator";
 import { ExecutionPanel } from "./components/modals/ExecutionPanel";
 import { ExportModal } from "./components/modals/ExportModal";
+import { IntentOrchestrator } from "./components/modals/IntentOrchestrator";
 import { VersionHistory } from "./components/modals/VersionHistory";
+import SettingsPage from "./components/settings/SettingsPage";
 import { PipelineToolbar } from "./components/sidebar/Toolbar";
 import { IntegratedBottomBar } from "./components/ui/IntegratedBottomBar";
 import { KeyboardHelp } from "./components/ui/KeyboardHelp";
+import { Toaster } from "./components/ui/Toaster";
 import { useAuthMeSync } from "./hooks/useAuthMeSync";
 import { GOOGLE_CLIENT_ID, isGoogleConfigured } from "./lib/google-auth";
 import { useStore } from "./store";
-import { shallow } from "zustand/shallow";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const user = useStore((s) => s.user);
@@ -141,50 +143,80 @@ const App: React.FC = () => {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [undo, redo, setSelectedNode, applyAutoLayout, setRightPanelMode]);
 
+  const AppShell = ({
+    children,
+    showBottomBar,
+    showToolBar,
+  }: {
+    children: React.ReactNode;
+    showBottomBar?: boolean;
+    showToolBar?: boolean;
+  }) => (
+    <ReactFlowProvider>
+      <div className="app-shell">
+        <Header showMenu={showToolBar} />
+        <div className="app-body">
+          {showToolBar && (
+            <aside className="left-palette">
+              <PipelineToolbar />
+            </aside>
+          )}
+          <main
+            className={`canvas-area${showBottomBar ? "" : " canvas-area--settings"}`}
+          >
+            {children}
+            {showBottomBar && (
+              <IntegratedBottomBar
+                onToggleChat={() => setChatOpen((v) => !v)}
+                chatOpen={chatOpen}
+              />
+            )}
+          </main>
+          <RightChatPanel open={chatOpen} onClose={() => setChatOpen(false)} />
+        </div>
+      </div>
+
+      {/* Global modals — rendered outside layout flow */}
+      <IntentOrchestrator />
+      <ExecutionPanel />
+      <ExportModal />
+      <VersionHistory />
+      {showKeyboardHelp && (
+        <KeyboardHelp onClose={() => setShowKeyboardHelp(false)} />
+      )}
+    </ReactFlowProvider>
+  );
+
   return (
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<AuthGate />} />
           <Route
-            path="/"
+            path="/settings"
             element={
               <ProtectedRoute>
-                <ReactFlowProvider>
-                  <div className="app-shell">
-                    <Header />
-                    <div className="app-body">
-                      <aside className="left-palette">
-                        <PipelineToolbar />
-                      </aside>
-                      <main className="canvas-area">
-                        <PipelineUI />
-                        <IntegratedBottomBar
-                          onToggleChat={() => setChatOpen((v) => !v)}
-                          chatOpen={chatOpen}
-                        />
-                      </main>
-                      <RightChatPanel
-                        open={chatOpen}
-                        onClose={() => setChatOpen(false)}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Global modals — rendered outside layout flow */}
-                  <IntentOrchestrator />
-                  <ExecutionPanel />
-                  <ExportModal />
-                  <VersionHistory />
-                  {showKeyboardHelp && (
-                    <KeyboardHelp onClose={() => setShowKeyboardHelp(false)} />
-                  )}
-                </ReactFlowProvider>
+                <AppShell>
+                  <SettingsPage />
+                </AppShell>
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <AppShell showBottomBar showToolBar>
+                  <PipelineUI />
+                </AppShell>
+              </ProtectedRoute>
+            }
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
+      {/* Global toast notifications — renders as a portal above everything */}
+      <Toaster />
     </GoogleOAuthProvider>
   );
 };

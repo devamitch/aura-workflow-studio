@@ -1,3 +1,5 @@
+import { getApiBaseUrl } from "../lib/runtime-config";
+
 export interface GoogleUserInfo {
   sub: string;
   email: string;
@@ -5,11 +7,10 @@ export interface GoogleUserInfo {
   picture?: string;
 }
 
-const API_URL = () =>
-  (import.meta.env.VITE_API_URL as string) || "http://localhost:8000";
-
-export async function fetchAuthMe(token: string): Promise<Record<string, unknown>> {
-  const response = await fetch(`${API_URL()}/auth/me`, {
+export async function fetchAuthMe(
+  token: string,
+): Promise<Record<string, unknown>> {
+  const response = await fetch(`${getApiBaseUrl()}/auth/me`, {
     headers: { Authorization: `Bearer ${token}` },
   });
 

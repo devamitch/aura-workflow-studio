@@ -26,6 +26,7 @@ import {
   autoLayoutDagre,
   validateGraphCredentials,
 } from "./services/graphCompiler";
+import { getApiBaseUrl } from "./lib/runtime-config";
 import type {
   ExecutionRun,
   ExportProjectType,
@@ -439,8 +440,6 @@ export function makeEdge(
   };
 }
 
-const API_URL = () =>
-  (import.meta.env.VITE_API_URL as string) || "http://localhost:8000";
 const applyTheme = (theme: "dark" | "light") => {
   if (typeof document !== "undefined") {
     document.body?.setAttribute("data-theme", theme);
@@ -879,7 +878,7 @@ export const useStore = create<CombinedStore>()(
     });
     writeSavedWorkflows(list.slice(0, 50));
     if (!token) return;
-    void fetch(`${API_URL()}/pipelines`, {
+    void fetch(`${getApiBaseUrl()}/pipelines`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

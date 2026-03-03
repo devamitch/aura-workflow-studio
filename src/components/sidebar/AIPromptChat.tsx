@@ -18,6 +18,7 @@ import {
   useWorkflowGenerationMutation,
   type GeminiMessage,
 } from "../../hooks/useGeminiMutations";
+import { toast } from "../../lib/toast";
 import { hasGeminiApiKey } from "../../services/geminiChat";
 import { useStore } from "../../store";
 import "./AIPromptChat.css";
@@ -147,6 +148,14 @@ export const AIPromptChat: React.FC<Props> = ({ embedded }) => {
     const text = input.trim();
     if (!text || streaming) return;
 
+    if (!geminiEnabled) {
+      toast.error(
+        "Add VITE_GEMINI_KEY to .env or go to Settings → Gemini Key to configure it.",
+        "No Gemini API Key",
+      );
+      return;
+    }
+
     if (!consumeCredit()) {
       setMessages((prev) => [...prev, {
         id: `limit-${Date.now()}`, role: "assistant" as const,
@@ -193,17 +202,15 @@ export const AIPromptChat: React.FC<Props> = ({ embedded }) => {
           if (hasTaskPlan) setPendingTaskList(fullText);
         },
         onError: (err) => {
+          const msg = err instanceof Error ? err.message : "Something went wrong.";
           setMessages((prev) =>
             prev.map((m) =>
               m.id === botId
-                ? {
-                    ...m,
-                    content: `⚠️ ${err instanceof Error ? err.message : "Something went wrong."}`,
-                    isStreaming: false,
-                  }
+                ? { ...m, content: `⚠️ ${msg}`, isStreaming: false }
                 : m,
             ),
           );
+          toast.error(msg, "Gemini Chat Error");
         },
       },
     );
@@ -235,17 +242,15 @@ export const AIPromptChat: React.FC<Props> = ({ embedded }) => {
           );
         },
         onError: (err) => {
+          const msg = err instanceof Error ? err.message : "Graph generation failed";
           setMessages((prev) =>
             prev.map((m) =>
               m.id === botId
-                ? {
-                    ...m,
-                    content: `⚠️ ${err instanceof Error ? err.message : "Graph generation failed"}`,
-                    isStreaming: false,
-                  }
+                ? { ...m, content: `⚠️ ${msg}`, isStreaming: false }
                 : m,
             ),
           );
+          toast.error(msg, "Workflow Generation Failed");
         },
       },
     );
@@ -335,7 +340,7 @@ export const AIPromptChat: React.FC<Props> = ({ embedded }) => {
       <div className="aura-input-area">
         {!geminiEnabled && (
           <div className="aura-key-warning">
-            <span>⚠️</span> Add <code>VITE_GEMINI_KEY</code> to <code>.env</code>
+            <span>⚠️</span> Add <code>VITE_GEMINI_KEY</code> to <code>.env</code> or set a key in <code>/settings</code>
           </div>
         )}
 

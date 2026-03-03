@@ -1,10 +1,11 @@
-const GEMINI_KEY = (import.meta.env.GEMINI_KEY as string) ?? "";
-const CHAT_MODELS = [
-  "gemini-3.0-flash",
-  "gemini-2.5-flash-preview-04-17",
-  "gemini-1.5-flash",
-] as const;
-const API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
+import type { Content } from "@google/genai";
+import {
+  GEMINI_MODEL_FALLBACKS,
+  hasGeminiApiKey as hasGeminiKey,
+  streamTextWithFallback,
+} from "./googleGenAI";
+
+const CHAT_MODELS = GEMINI_MODEL_FALLBACKS;
 
 export interface GeminiMessage {
   role: "user" | "model";
@@ -21,82 +22,38 @@ When generating workflows, be creative and practical. Think in terms of triggers
 Keep responses concise and actionable.`;
 
 export function hasGeminiApiKey(): boolean {
-  return Boolean(GEMINI_KEY);
+  return hasGeminiKey();
 }
 
+/**
+ * Streams a Gemini chat reply.
+ * Throws on API key missing or all-models failure so callers get proper error handling.
+ */
 export async function streamGeminiChatReply(
   history: GeminiMessage[],
   userText: string,
   onChunk?: (text: string) => void,
 ): Promise<string> {
-  if (!GEMINI_KEY) {
-    return "⚠️ No Gemini API key found. Add VITE_GEMINI_KEY to your .env file.";
+  if (!hasGeminiKey()) {
+    throw new Error(
+      "No Gemini API key found. Add VITE_GEMINI_KEY to .env or go to Settings → Gemini Key to set one.",
+    );
   }
 
-  const contents = [
+  const contents: Content[] = [
     ...history.map((m) => ({ role: m.role, parts: [{ text: m.text }] })),
-    { role: "user" as const, parts: [{ text: userText }] },
+    { role: "user", parts: [{ text: userText }] },
   ];
 
-  for (const model of CHAT_MODELS) {
-    try {
-      const response = await fetch(
-        `${API_BASE}/${model}:streamGenerateContent?alt=sse&key=${GEMINI_KEY}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: CHAT_SYSTEM_PROMPT }] },
-            contents,
-            generationConfig: { temperature: 0.65, maxOutputTokens: 2048 },
-          }),
-        },
-      );
-
-      if (!response.ok || !response.body) continue;
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let fullText = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          const payload = line.slice(6).trim();
-          if (!payload || payload === "[DONE]") continue;
-
-          try {
-            const json = JSON.parse(payload) as Record<string, unknown>;
-            const text = (
-              (
-                (
-                  json.candidates as Array<Record<string, unknown>> | undefined
-                )?.[0]?.content as Record<string, unknown> | undefined
-              )?.parts as Array<Record<string, unknown>> | undefined
-            )?.[0]?.text as string | undefined;
-
-            if (!text) continue;
-            fullText += text;
-            onChunk?.(text);
-          } catch {
-            // Ignore malformed SSE lines.
-          }
-        }
-      }
-
-      if (fullText) return fullText;
-    } catch {
-      // Try fallback model.
-    }
-  }
-
-  return "⚠️ Gemini API unavailable. Please check your API key and try again.";
+  // streamTextWithFallback throws on failure — let it propagate
+  return streamTextWithFallback({
+    models: CHAT_MODELS,
+    contents,
+    config: {
+      systemInstruction: CHAT_SYSTEM_PROMPT,
+      temperature: 0.65,
+      maxOutputTokens: 2048,
+    },
+    onChunk,
+  });
 }

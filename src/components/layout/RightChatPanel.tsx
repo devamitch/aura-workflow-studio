@@ -1,8 +1,8 @@
-import React from "react";
 import { ChevronRight, Settings, Sparkles } from "lucide-react";
-import { AIPromptChat } from "../sidebar/AIPromptChat";
-import { NodeSidebar } from "../node/NodeSidebar";
+import React from "react";
 import { useStore } from "../../store";
+import { NodeSidebar } from "../node/NodeSidebar";
+import { AIPromptChat } from "../sidebar/AIPromptChat";
 
 interface Props {
   open: boolean;
@@ -35,7 +35,11 @@ export const RightChatPanel: React.FC<Props> = ({ open, onClose }) => {
             {selectedNodeId && <span className="right-panel-tab-dot" />}
           </button>
         </div>
-        <button className="right-panel-close" onClick={onClose} title="Close panel">
+        <button
+          className="right-panel-close"
+          onClick={onClose}
+          title="Close panel"
+        >
           <ChevronRight size={16} />
         </button>
       </div>
