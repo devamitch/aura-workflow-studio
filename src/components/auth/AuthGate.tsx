@@ -201,7 +201,7 @@ export const AuthGate: React.FC = () => {
 
         <div className="auth-brand-row">
           <span className="auth-brand-name">
-            Aura<span>Flow</span>
+            Aura <span>Studio</span>{" "}
           </span>
           <span className="auth-brand-beta">BETA</span>
         </div>
