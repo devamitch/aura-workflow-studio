@@ -13,66 +13,14 @@ import {
   Wand2,
 } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
+import {
+  useChatReplyMutation,
+  useWorkflowGenerationMutation,
+  type GeminiMessage,
+} from "../../hooks/useGeminiMutations";
+import { hasGeminiApiKey } from "../../services/geminiChat";
 import { useStore } from "../../store";
-import { generateWorkflowFromPrompt, streamTaskPlan } from "../../services/promptToCanvas";
 import "./AIPromptChat.css";
-
-// ── Gemini REST streaming ──────────────────────────────────────────────────────
-const GEMINI_KEY = (import.meta.env.VITE_GEMINI_KEY as string) ?? "";
-const CHAT_MODEL = "gemini-2.5-flash-preview-04-17";
-const CHAT_FALLBACK = "gemini-1.5-flash";
-const API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
-
-const CHAT_SYSTEM_PROMPT = `You are Aura, an expert AI workflow architect. You help users design and build visual AI automation pipelines.
-
-When a user describes a workflow:
-1. First reply with a clear, numbered TASK PLAN (max 8 steps). Each step is one sentence describing what the workflow will DO.
-2. Do NOT generate JSON yet — present the plan and wait.
-
-When generating workflows, be creative and practical. Think in terms of triggers, data transforms, AI models, integrations, and outputs.
-Keep responses concise and actionable.`;
-
-interface GeminiMessage { role: "user" | "model"; text: string; }
-
-async function* streamChat(history: GeminiMessage[], userText: string): AsyncGenerator<string> {
-  if (!GEMINI_KEY) { yield "⚠️ No Gemini API key found. Add VITE_GEMINI_KEY to your .env file."; return; }
-
-  const contents = [
-    ...history.map((m) => ({ role: m.role, parts: [{ text: m.text }] })),
-    { role: "user", parts: [{ text: userText }] },
-  ];
-
-  for (const model of [CHAT_MODEL, CHAT_FALLBACK]) {
-    try {
-      const res = await fetch(`${API_BASE}/${model}:streamGenerateContent?alt=sse&key=${GEMINI_KEY}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: CHAT_SYSTEM_PROMPT }] },
-          contents,
-          generationConfig: { temperature: 0.65, maxOutputTokens: 2048 },
-        }),
-      });
-      if (!res.ok || !res.body) continue;
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const lines = decoder.decode(value, { stream: true }).split("\n").filter((l) => l.startsWith("data: "));
-        for (const line of lines) {
-          try {
-            const json = JSON.parse(line.slice(6));
-            const text: string = json.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-            if (text) yield text;
-          } catch { /* skip malformed SSE */ }
-        }
-      }
-      return;
-    } catch { continue; }
-  }
-  yield "⚠️ Gemini API unavailable. Please check your API key and try again.";
-}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface ChatMessage {
@@ -163,10 +111,8 @@ interface Props { embedded?: boolean; }
 export const AIPromptChat: React.FC<Props> = ({ embedded }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME]);
   const [input, setInput] = useState("");
-  const [streaming, setStreaming] = useState(false);
   const [recording, setRecording] = useState(false);
   const [pendingTaskList, setPendingTaskList] = useState<string | null>(null);
-  const [buildingGraph, setBuildingGraph] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -176,6 +122,11 @@ export const AIPromptChat: React.FC<Props> = ({ embedded }) => {
   const applyGeneratedGraph = useStore((s) => s.applyGeneratedGraph);
   const consumeCredit = useStore((s) => s.consumeCredit);
   const user = useStore((s) => s.user);
+  const chatReplyMutation = useChatReplyMutation();
+  const workflowMutation = useWorkflowGenerationMutation();
+  const streaming = chatReplyMutation.isPending;
+  const buildingGraph = workflowMutation.isPending;
+  const geminiEnabled = hasGeminiApiKey();
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, streaming]);
 
@@ -212,60 +163,92 @@ export const AIPromptChat: React.FC<Props> = ({ embedded }) => {
       { id: botId, role: "assistant", content: "", isStreaming: true, timestamp: new Date().toISOString() },
     ]);
     setInput("");
-    setStreaming(true);
+    const history = buildHistory();
 
-    try {
-      const history = buildHistory();
-      let fullText = "";
-
-      for await (const chunk of streamChat(history, text)) {
-        fullText += chunk;
-        setMessages((prev) => prev.map((m) => m.id === botId ? { ...m, content: fullText } : m));
-      }
-
-      const hasTaskPlan = /^\d+\./m.test(fullText);
-      setMessages((prev) =>
-        prev.map((m) => m.id === botId ? { ...m, isStreaming: false, taskList: hasTaskPlan ? fullText : undefined } : m)
-      );
-      if (hasTaskPlan) setPendingTaskList(fullText);
-    } catch (err) {
-      setMessages((prev) =>
-        prev.map((m) => m.id === botId ? {
-          ...m, content: `⚠️ ${err instanceof Error ? err.message : "Something went wrong."}`, isStreaming: false,
-        } : m)
-      );
-    } finally {
-      setStreaming(false);
-    }
+    chatReplyMutation.mutate(
+      {
+        history,
+        userText: text,
+        onChunk: (_, accumulated) => {
+          setMessages((prev) =>
+            prev.map((m) => (m.id === botId ? { ...m, content: accumulated } : m)),
+          );
+        },
+      },
+      {
+        onSuccess: (fullText) => {
+          const hasTaskPlan = /^\d+\./m.test(fullText);
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === botId
+                ? {
+                    ...m,
+                    content: fullText,
+                    isStreaming: false,
+                    taskList: hasTaskPlan ? fullText : undefined,
+                  }
+                : m,
+            ),
+          );
+          if (hasTaskPlan) setPendingTaskList(fullText);
+        },
+        onError: (err) => {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === botId
+                ? {
+                    ...m,
+                    content: `⚠️ ${err instanceof Error ? err.message : "Something went wrong."}`,
+                    isStreaming: false,
+                  }
+                : m,
+            ),
+          );
+        },
+      },
+    );
   };
 
   // ── Generate graph using the proper service ───────────────────────────────
   const handleGenerateGraph = async (taskList: string) => {
-    setBuildingGraph(true);
+    if (buildingGraph) return;
     const botId = `graph-gen-${Date.now()}`;
     setMessages((prev) => [...prev, { id: botId, role: "assistant", content: "Building workflow…", isStreaming: true, timestamp: new Date().toISOString() }]);
 
-    try {
-      const { nodes, edges } = await generateWorkflowFromPrompt(taskList, buildHistory());
-      applyGeneratedGraph(nodes, edges);
-      setPendingTaskList(null);
-      setMessages((prev) =>
-        prev.map((m) => m.id === botId ? {
-          ...m,
-          content: `✅ Workflow ready — **${nodes.length} nodes**, **${edges.length} connections**. Check the canvas →`,
-          isStreaming: false,
-          graphGenerated: true,
-        } : m)
-      );
-    } catch (err) {
-      setMessages((prev) =>
-        prev.map((m) => m.id === botId ? {
-          ...m, content: `⚠️ ${err instanceof Error ? err.message : "Graph generation failed"}`, isStreaming: false,
-        } : m)
-      );
-    } finally {
-      setBuildingGraph(false);
-    }
+    workflowMutation.mutate(
+      { prompt: taskList, history: buildHistory() },
+      {
+        onSuccess: ({ nodes, edges }) => {
+          applyGeneratedGraph(nodes, edges);
+          setPendingTaskList(null);
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === botId
+                ? {
+                    ...m,
+                    content: `✅ Workflow ready — **${nodes.length} nodes**, **${edges.length} connections**. Check the canvas →`,
+                    isStreaming: false,
+                    graphGenerated: true,
+                  }
+                : m,
+            ),
+          );
+        },
+        onError: (err) => {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === botId
+                ? {
+                    ...m,
+                    content: `⚠️ ${err instanceof Error ? err.message : "Graph generation failed"}`,
+                    isStreaming: false,
+                  }
+                : m,
+            ),
+          );
+        },
+      },
+    );
   };
 
   // ── Voice ─────────────────────────────────────────────────────────────────
@@ -350,7 +333,7 @@ export const AIPromptChat: React.FC<Props> = ({ embedded }) => {
 
       {/* ── Input ──────────────────────────────────────────────────────── */}
       <div className="aura-input-area">
-        {!GEMINI_KEY && (
+        {!geminiEnabled && (
           <div className="aura-key-warning">
             <span>⚠️</span> Add <code>VITE_GEMINI_KEY</code> to <code>.env</code>
           </div>

@@ -5,8 +5,11 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { Bot, CheckCircle, ChevronRight, Loader2, Sparkles, Wand2, X } from "lucide-react";
 import React, { useRef, useState } from "react";
+import {
+  useTaskPlanMutation,
+  useWorkflowGenerationMutation,
+} from "../../hooks/useGeminiMutations";
 import { useStore } from "../../store";
-import { generateWorkflowFromPrompt, streamTaskPlan } from "../../services/promptToCanvas";
 
 interface Step {
   text: string;
@@ -26,6 +29,8 @@ export const IntentOrchestrator: React.FC = () => {
   const [error, setError] = useState("");
   const [nodeCount, setNodeCount] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const taskPlanMutation = useTaskPlanMutation();
+  const workflowMutation = useWorkflowGenerationMutation();
 
   const reset = () => {
     setPhase("input"); setPlanText(""); setSteps([]); setError(""); setPrompt(""); setNodeCount(0);
@@ -34,8 +39,9 @@ export const IntentOrchestrator: React.FC = () => {
   const close = () => { setShowIntentOrchestrator(false); reset(); };
 
   // ── Phase 1: Generate task plan ───────────────────────────────────────────
-  const handleGeneratePlan = async () => {
+  const handleGeneratePlan = () => {
     if (!prompt.trim()) return;
+    if (taskPlanMutation.isPending) return;
     if (!consumeCredit()) {
       setError("You've used all your free credits. Please upgrade to continue.");
       setPhase("error");
@@ -44,24 +50,32 @@ export const IntentOrchestrator: React.FC = () => {
     setPhase("planning");
     setPlanText("");
     setSteps([]);
-    try {
-      let accumulated = "";
-      for await (const chunk of streamTaskPlan(prompt)) {
-        accumulated += chunk;
+    setError("");
+    taskPlanMutation.mutate(
+      {
+        prompt,
+        onChunk: (_, accumulated) => {
         setPlanText(accumulated);
         // Parse numbered steps from accumulated text
         const matches = accumulated.match(/^\d+\..+/gm) ?? [];
         setSteps(matches.map((t) => ({ text: t, done: false })));
-      }
-      setPhase("plan-ready");
-    } catch (e) {
-      setError(String(e));
-      setPhase("error");
-    }
+        },
+      },
+      {
+        onSuccess: () => {
+          setPhase("plan-ready");
+        },
+        onError: (e) => {
+          setError(e instanceof Error ? e.message : String(e));
+          setPhase("error");
+        },
+      },
+    );
   };
 
   // ── Phase 2: Generate workflow JSON and apply to canvas ───────────────────
   const handleBuildWorkflow = async () => {
+    if (workflowMutation.isPending) return;
     setPhase("generating");
     try {
       // Animate steps as "processing"
@@ -70,7 +84,7 @@ export const IntentOrchestrator: React.FC = () => {
         setSteps((prev) => prev.map((s, idx) => idx === i ? { ...s, done: true } : s));
       }
 
-      const { nodes, edges } = await generateWorkflowFromPrompt(prompt);
+      const { nodes, edges } = await workflowMutation.mutateAsync({ prompt });
       setNodeCount(nodes.length);
       applyGeneratedGraph(nodes, edges);
       setPhase("done");
@@ -131,7 +145,11 @@ export const IntentOrchestrator: React.FC = () => {
               </div>
               <div className="io-footer">
                 <span className="io-hint">Cmd+Enter to generate</span>
-                <button className="io-generate-btn" onClick={() => void handleGeneratePlan()} disabled={!prompt.trim()}>
+                <button
+                  className="io-generate-btn"
+                  onClick={() => void handleGeneratePlan()}
+                  disabled={!prompt.trim() || taskPlanMutation.isPending}
+                >
                   <Sparkles size={15} />
                   Generate Plan
                 </button>
@@ -171,7 +189,11 @@ export const IntentOrchestrator: React.FC = () => {
               </div>
               <div className="io-footer">
                 <button className="io-back-btn" onClick={() => setPhase("input")}>Edit Prompt</button>
-                <button className="io-generate-btn" onClick={() => void handleBuildWorkflow()}>
+                <button
+                  className="io-generate-btn"
+                  onClick={() => void handleBuildWorkflow()}
+                  disabled={workflowMutation.isPending}
+                >
                   <Wand2 size={15} />
                   Build Workflow
                 </button>

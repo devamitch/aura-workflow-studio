@@ -16,7 +16,10 @@ import {
   Wand2,
   Zap,
 } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import React, { useRef, useState } from "react";
+import { shallow } from "zustand/shallow";
+import { AUTH_ME_QUERY_KEY } from "../../hooks/useAuthMeSync";
 import { useStore } from "../../store";
 import { WorkflowsModal } from "../sidebar/WorkflowsModal";
 import { PricingModal } from "../ui/PricingModal";
@@ -28,29 +31,63 @@ export const Header: React.FC = () => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const saveInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const queryClient = useQueryClient();
 
-  const theme = useStore((s) => s.theme);
-  const toggleTheme = useStore((s) => s.toggleTheme);
-  const user = useStore((s) => s.user);
-  const signOut = useStore((s) => s.signOut);
-  const clearCanvas = useStore((s) => s.clearCanvas);
-  const loadDemo = useStore((s) => s.loadDemo);
-  const saveWorkflow = useStore((s) => s.saveWorkflow);
-  const exportToJSON = useStore((s) => s.exportToJSON);
-  const importFromJSON = useStore((s) => s.importFromJSON);
-  const applyAutoLayout = useStore((s) => s.applyAutoLayout);
-  const nodes = useStore((s) => s.nodes);
-  const edges = useStore((s) => s.edges);
-  const plan = useStore((s) => s.plan);
-  const showPricingModal = useStore((s) => s.showPricingModal);
-  const pricingTab = useStore((s) => s.pricingTab);
-  const setShowPricingModal = useStore((s) => s.setShowPricingModal);
-  const setShowIntentOrchestrator = useStore(
-    (s) => s.setShowIntentOrchestrator,
+  const {
+    theme,
+    toggleTheme,
+    user,
+    signOut,
+    clearCanvas,
+    loadDemo,
+    saveWorkflow,
+    exportToJSON,
+    importFromJSON,
+    applyAutoLayout,
+    nodes,
+    edges,
+    plan,
+    showPricingModal,
+    pricingTab,
+    setShowPricingModal,
+    setShowIntentOrchestrator,
+    setShowExecutionPanel,
+    setShowExportModal,
+    setShowVersionHistory,
+  } = useStore(
+    (s) => ({
+      theme: s.theme,
+      toggleTheme: s.toggleTheme,
+      user: s.user,
+      signOut: s.signOut,
+      clearCanvas: s.clearCanvas,
+      loadDemo: s.loadDemo,
+      saveWorkflow: s.saveWorkflow,
+      exportToJSON: s.exportToJSON,
+      importFromJSON: s.importFromJSON,
+      applyAutoLayout: s.applyAutoLayout,
+      nodes: s.nodes,
+      edges: s.edges,
+      plan: s.plan,
+      showPricingModal: s.showPricingModal,
+      pricingTab: s.pricingTab,
+      setShowPricingModal: s.setShowPricingModal,
+      setShowIntentOrchestrator: s.setShowIntentOrchestrator,
+      setShowExecutionPanel: s.setShowExecutionPanel,
+      setShowExportModal: s.setShowExportModal,
+      setShowVersionHistory: s.setShowVersionHistory,
+    }),
+    shallow,
   );
-  const setShowExecutionPanel = useStore((s) => s.setShowExecutionPanel);
-  const setShowExportModal = useStore((s) => s.setShowExportModal);
-  const setShowVersionHistory = useStore((s) => s.setShowVersionHistory);
+
+  const signOutMutation = useMutation({
+    mutationFn: async () => {
+      await signOut();
+    },
+    onSuccess: () => {
+      queryClient.removeQueries({ queryKey: AUTH_ME_QUERY_KEY });
+    },
+  });
 
   const creditsLeft =
     plan.tier === "free"
@@ -361,7 +398,11 @@ export const Header: React.FC = () => {
                   </button>
                   <button
                     className="header-dropdown-item danger"
-                    onClick={() => void signOut()}
+                    onClick={() => {
+                      setShowUserMenu(false);
+                      signOutMutation.mutate();
+                    }}
+                    disabled={signOutMutation.isPending}
                   >
                     <LogOut size={13} />
                     Sign out

@@ -3,6 +3,7 @@ import {
   useGoogleLogin,
   useGoogleOneTapLogin,
 } from "@react-oauth/google";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Bot,
   Brain,
@@ -15,11 +16,13 @@ import {
 import React, { useEffect, useState } from "react";
 import appIcon from "../../assets/app-icon.png";
 import authBanner from "../../assets/auth-banner.png";
+import { AUTH_ME_QUERY_KEY } from "../../hooks/useAuthMeSync";
 import {
   decodeJwtPayload,
   isGoogleConfigured,
   type GooglePayload,
 } from "../../lib/google-auth";
+import { fetchGoogleUserInfo } from "../../services/authApi";
 import { useStore } from "../../store";
 
 const PILLS = [
@@ -86,10 +89,30 @@ const upsertSaved = (p: GooglePayload) => {
 import { Navigate } from "react-router-dom";
 
 export const AuthGate: React.FC = () => {
-  const { user, loading, signInWithGoogle } = useStore();
+  const user = useStore((s) => s.user);
+  const loading = useStore((s) => s.loading);
+  const signInWithGoogle = useStore((s) => s.signInWithGoogle);
+  const queryClient = useQueryClient();
   const [authError, setAuthError] = useState("");
   const [saved, setSaved] = useState<SavedAccount[]>([]);
-  const [isSigningIn, setIsSigningIn] = useState(false);
+
+  const oneTapSignIn = useMutation({
+    mutationFn: async (credential: string) => {
+      await signInWithGoogle(credential);
+      await queryClient.invalidateQueries({ queryKey: AUTH_ME_QUERY_KEY });
+    },
+  });
+
+  const popupSignIn = useMutation({
+    mutationFn: async (accessToken: string) => {
+      const userInfo = await fetchGoogleUserInfo(accessToken);
+      await signInWithGoogle(accessToken, userInfo);
+      await queryClient.invalidateQueries({ queryKey: AUTH_ME_QUERY_KEY });
+      return userInfo;
+    },
+  });
+
+  const isSigningIn = oneTapSignIn.isPending || popupSignIn.isPending;
 
   useEffect(() => {
     setSaved(readSaved());
@@ -98,10 +121,10 @@ export const AuthGate: React.FC = () => {
   // 1. One Tap Auto Sign-in (returns a JWT)
   useGoogleOneTapLogin({
     onSuccess: (res) => {
-      if (!res.credential) return;
-      setIsSigningIn(true);
-      void signInWithGoogle(res.credential)
-        .then(() => {
+      if (!res.credential || isSigningIn) return;
+      setAuthError("");
+      oneTapSignIn.mutate(res.credential, {
+        onSuccess: () => {
           try {
             upsertSaved(
               decodeJwtPayload<GooglePayload>(res.credential as string),
@@ -110,8 +133,9 @@ export const AuthGate: React.FC = () => {
           } catch {
             /* skip */
           }
-        })
-        .catch(() => setAuthError("Unable to auto sign in."));
+        },
+        onError: () => setAuthError("Unable to auto sign in."),
+      });
     },
     onError: () => console.log("One tap login suppressed or failed"),
     auto_select: true, // Auto sign-in if available!
@@ -119,37 +143,26 @@ export const AuthGate: React.FC = () => {
 
   // 2. Custom Button Sign-in (returns an Access Token, fetches User Info)
   const customGoogleLogin = useGoogleLogin({
-    onSuccess: async (tokenResponse) => {
+    onSuccess: (tokenResponse) => {
       setAuthError("");
-      setIsSigningIn(true);
-      try {
-        const userInfoRes = await fetch(
-          "https://www.googleapis.com/oauth2/v3/userinfo",
-          {
-            headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
-          },
-        );
-        const userInfo = await userInfoRes.json();
-
-        await signInWithGoogle(tokenResponse.access_token, userInfo);
-
-        // Save to local fast-login cache
-        upsertSaved({
-          sub: userInfo.sub,
-          email: userInfo.email,
-          name: userInfo.name,
-          picture: userInfo.picture,
-          exp: Date.now() / 1000 + 3600, // Valid for an hour loosely
-        });
-        setSaved(readSaved());
-      } catch (err) {
-        setAuthError("Unable to fetch user info from Google.");
-        setIsSigningIn(false);
-      }
+      popupSignIn.mutate(tokenResponse.access_token, {
+        onSuccess: (userInfo) => {
+          upsertSaved({
+            sub: userInfo.sub,
+            email: userInfo.email,
+            name: userInfo.name,
+            picture: userInfo.picture,
+            exp: Date.now() / 1000 + 3600, // Valid for an hour loosely
+          });
+          setSaved(readSaved());
+        },
+        onError: () => {
+          setAuthError("Unable to fetch user info from Google.");
+        },
+      });
     },
     onError: () => {
       setAuthError("Google sign-in popup failed.");
-      setIsSigningIn(false);
     },
   });
 

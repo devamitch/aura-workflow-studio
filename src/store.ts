@@ -9,26 +9,33 @@ import {
   type NodeChange,
 } from "reactflow";
 import { create } from "zustand";
+import { createJSONStorage, persist } from "zustand/middleware";
+
 import {
   clearToken,
+  clearCachedProfile,
   decodeJwtPayload,
   isGoogleConfigured,
+  loadCachedProfile,
   loadToken,
+  saveCachedProfile,
   saveToken,
   type GooglePayload,
 } from "./lib/google-auth";
+import {
+  autoLayoutDagre,
+  validateGraphCredentials,
+} from "./services/graphCompiler";
 import type {
+  ExecutionRun,
+  ExportProjectType,
   HandleConfig,
   PipelineEdge,
   PipelineNode,
-  UserPlan,
   PlanTier,
-  ExecutionRun,
+  UserPlan,
   WorkflowVersion,
-  ExportProjectType,
 } from "./types";
-import { autoLayoutDagre } from "./services/graphCompiler";
-import { validateGraphCredentials } from "./services/graphCompiler";
 
 // ── Auth User (local interface matching types.ts) ─────────────────────────────
 export interface AuthUser {
@@ -43,30 +50,174 @@ export interface AuthUser {
 
 // ── Demo Data ─────────────────────────────────────────────────────────────────
 const demoNodes: PipelineNode[] = [
-  { id: "d-input1", type: "customInput", position: { x: 60, y: 80 }, data: { id: "d-input1", nodeType: "customInput", label: "User Query", inputName: "user_query", inputType: "Text" } },
-  { id: "d-input2", type: "customInput", position: { x: 60, y: 330 }, data: { id: "d-input2", nodeType: "customInput", label: "Research Topic", inputName: "topic", inputType: "Text" } },
-  { id: "d-text", type: "text", position: { x: 60, y: 560 }, data: { id: "d-text", nodeType: "text", label: "System Prompt", text: "You are an expert research analyst. Synthesize information into a comprehensive report." } },
-  { id: "d-api", type: "api", position: { x: 420, y: 440 }, data: { id: "d-api", nodeType: "api", label: "Fetch Research", method: "GET", url: "https://api.research.io/search" } },
-  { id: "d-filter", type: "filter", position: { x: 420, y: 640 }, data: { id: "d-filter", nodeType: "filter", label: "Filter Results", condition: "value.relevance_score > 0.7" } },
-  { id: "d-llm", type: "llm", position: { x: 420, y: 100 }, data: { id: "d-llm", nodeType: "llm", label: "Analyze with LLM" } },
-  { id: "d-merge", type: "merge", position: { x: 760, y: 300 }, data: { id: "d-merge", nodeType: "merge", label: "Merge Outputs" } },
-  { id: "d-output", type: "customOutput", position: { x: 1060, y: 300 }, data: { id: "d-output", nodeType: "customOutput", label: "Research Report", outputName: "research_report" } },
+  {
+    id: "d-input1",
+    type: "customInput",
+    position: { x: 60, y: 80 },
+    data: {
+      id: "d-input1",
+      nodeType: "customInput",
+      label: "User Query",
+      inputName: "user_query",
+      inputType: "Text",
+    },
+  },
+  {
+    id: "d-input2",
+    type: "customInput",
+    position: { x: 60, y: 330 },
+    data: {
+      id: "d-input2",
+      nodeType: "customInput",
+      label: "Research Topic",
+      inputName: "topic",
+      inputType: "Text",
+    },
+  },
+  {
+    id: "d-text",
+    type: "text",
+    position: { x: 60, y: 560 },
+    data: {
+      id: "d-text",
+      nodeType: "text",
+      label: "System Prompt",
+      text: "You are an expert research analyst. Synthesize information into a comprehensive report.",
+    },
+  },
+  {
+    id: "d-api",
+    type: "api",
+    position: { x: 420, y: 440 },
+    data: {
+      id: "d-api",
+      nodeType: "api",
+      label: "Fetch Research",
+      method: "GET",
+      url: "https://api.research.io/search",
+    },
+  },
+  {
+    id: "d-filter",
+    type: "filter",
+    position: { x: 420, y: 640 },
+    data: {
+      id: "d-filter",
+      nodeType: "filter",
+      label: "Filter Results",
+      condition: "value.relevance_score > 0.7",
+    },
+  },
+  {
+    id: "d-llm",
+    type: "llm",
+    position: { x: 420, y: 100 },
+    data: { id: "d-llm", nodeType: "llm", label: "Analyze with LLM" },
+  },
+  {
+    id: "d-merge",
+    type: "merge",
+    position: { x: 760, y: 300 },
+    data: { id: "d-merge", nodeType: "merge", label: "Merge Outputs" },
+  },
+  {
+    id: "d-output",
+    type: "customOutput",
+    position: { x: 1060, y: 300 },
+    data: {
+      id: "d-output",
+      nodeType: "customOutput",
+      label: "Research Report",
+      outputName: "research_report",
+    },
+  },
 ];
 
 const demoEdges: PipelineEdge[] = [
-  { id: "de-1", source: "d-input1", sourceHandle: "d-input1-value", target: "d-llm", targetHandle: "d-llm-prompt", type: "smoothstep", animated: true, markerEnd: { type: MarkerType.Arrow, height: 20, width: 20 }, data: { edgeColor: "#6366f1" } },
-  { id: "de-2", source: "d-text", sourceHandle: "d-text-value", target: "d-llm", targetHandle: "d-llm-system", type: "smoothstep", animated: true, markerEnd: { type: MarkerType.Arrow, height: 20, width: 20 }, data: { edgeColor: "#6366f1" } },
-  { id: "de-3", source: "d-input2", sourceHandle: "d-input2-value", target: "d-api", targetHandle: "d-api-body", type: "smoothstep", animated: true, markerEnd: { type: MarkerType.Arrow, height: 20, width: 20 }, data: { edgeColor: "#f59e0b" } },
-  { id: "de-4", source: "d-api", sourceHandle: "d-api-response", target: "d-filter", targetHandle: "d-filter-input", type: "smoothstep", animated: true, markerEnd: { type: MarkerType.Arrow, height: 20, width: 20 }, data: { edgeColor: "#f59e0b" } },
-  { id: "de-5", source: "d-llm", sourceHandle: "d-llm-response", target: "d-merge", targetHandle: "d-merge-input-a", type: "smoothstep", animated: true, markerEnd: { type: MarkerType.Arrow, height: 20, width: 20 }, data: { edgeColor: "#10b981" } },
-  { id: "de-6", source: "d-filter", sourceHandle: "d-filter-pass", target: "d-merge", targetHandle: "d-merge-input-b", type: "smoothstep", animated: true, markerEnd: { type: MarkerType.Arrow, height: 20, width: 20 }, data: { edgeColor: "#3b82f6" } },
-  { id: "de-7", source: "d-merge", sourceHandle: "d-merge-merged", target: "d-output", targetHandle: "d-output-value", type: "smoothstep", animated: true, markerEnd: { type: MarkerType.Arrow, height: 20, width: 20 }, data: { edgeColor: "#6366f1" } },
+  {
+    id: "de-1",
+    source: "d-input1",
+    sourceHandle: "d-input1-value",
+    target: "d-llm",
+    targetHandle: "d-llm-prompt",
+    type: "smoothstep",
+    animated: true,
+    markerEnd: { type: MarkerType.Arrow, height: 20, width: 20 },
+    data: { edgeColor: "#6366f1" },
+  },
+  {
+    id: "de-2",
+    source: "d-text",
+    sourceHandle: "d-text-value",
+    target: "d-llm",
+    targetHandle: "d-llm-system",
+    type: "smoothstep",
+    animated: true,
+    markerEnd: { type: MarkerType.Arrow, height: 20, width: 20 },
+    data: { edgeColor: "#6366f1" },
+  },
+  {
+    id: "de-3",
+    source: "d-input2",
+    sourceHandle: "d-input2-value",
+    target: "d-api",
+    targetHandle: "d-api-body",
+    type: "smoothstep",
+    animated: true,
+    markerEnd: { type: MarkerType.Arrow, height: 20, width: 20 },
+    data: { edgeColor: "#f59e0b" },
+  },
+  {
+    id: "de-4",
+    source: "d-api",
+    sourceHandle: "d-api-response",
+    target: "d-filter",
+    targetHandle: "d-filter-input",
+    type: "smoothstep",
+    animated: true,
+    markerEnd: { type: MarkerType.Arrow, height: 20, width: 20 },
+    data: { edgeColor: "#f59e0b" },
+  },
+  {
+    id: "de-5",
+    source: "d-llm",
+    sourceHandle: "d-llm-response",
+    target: "d-merge",
+    targetHandle: "d-merge-input-a",
+    type: "smoothstep",
+    animated: true,
+    markerEnd: { type: MarkerType.Arrow, height: 20, width: 20 },
+    data: { edgeColor: "#10b981" },
+  },
+  {
+    id: "de-6",
+    source: "d-filter",
+    sourceHandle: "d-filter-pass",
+    target: "d-merge",
+    targetHandle: "d-merge-input-b",
+    type: "smoothstep",
+    animated: true,
+    markerEnd: { type: MarkerType.Arrow, height: 20, width: 20 },
+    data: { edgeColor: "#3b82f6" },
+  },
+  {
+    id: "de-7",
+    source: "d-merge",
+    sourceHandle: "d-merge-merged",
+    target: "d-output",
+    targetHandle: "d-output-value",
+    type: "smoothstep",
+    animated: true,
+    markerEnd: { type: MarkerType.Arrow, height: 20, width: 20 },
+    data: { edgeColor: "#6366f1" },
+  },
 ];
 
 // ── Persistence helpers ────────────────────────────────────────────────────────
 const LS_KEY = "vs_saved_workflows";
 const PLAN_LS_KEY = "aura_user_plan";
 const VERSIONS_KEY = "aura_workflow_versions";
+const STORE_KEY = "aura_store";
 
 export interface SavedWorkflow {
   id: string;
@@ -79,24 +230,60 @@ export interface SavedWorkflow {
 }
 
 function readSavedWorkflows(): SavedWorkflow[] {
-  try { return JSON.parse(localStorage.getItem(LS_KEY) ?? "[]"); } catch { return []; }
+  try {
+    return JSON.parse(localStorage.getItem(LS_KEY) ?? "[]");
+  } catch {
+    return [];
+  }
 }
 function writeSavedWorkflows(list: SavedWorkflow[]) {
-  try { localStorage.setItem(LS_KEY, JSON.stringify(list)); } catch {}
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(list));
+  } catch {}
 }
 
 function readVersions(): WorkflowVersion[] {
-  try { return JSON.parse(localStorage.getItem(VERSIONS_KEY) ?? "[]"); } catch { return []; }
+  try {
+    return JSON.parse(localStorage.getItem(VERSIONS_KEY) ?? "[]");
+  } catch {
+    return [];
+  }
 }
 function writeVersions(v: WorkflowVersion[]) {
-  try { localStorage.setItem(VERSIONS_KEY, JSON.stringify(v)); } catch {}
+  try {
+    localStorage.setItem(VERSIONS_KEY, JSON.stringify(v));
+  } catch {}
 }
 
 // ── Plan ──────────────────────────────────────────────────────────────────────
-export const PLAN_LIMITS: Record<PlanTier, { aiGenerations: number; modelAccess: string[] }> = {
+export const PLAN_LIMITS: Record<
+  PlanTier,
+  { aiGenerations: number; modelAccess: string[] }
+> = {
   free: { aiGenerations: 20, modelAccess: ["gemini-1.5-flash"] },
-  pro: { aiGenerations: Infinity, modelAccess: ["gemini-1.5-flash", "gemini-2.5-flash", "gpt-4o", "gpt-4o-mini", "claude-sonnet-4-6", "claude-haiku-4-5-20251001"] },
-  annual: { aiGenerations: Infinity, modelAccess: ["gemini-1.5-flash", "gemini-2.5-flash", "gpt-4o", "gpt-4o-mini", "claude-sonnet-4-6", "claude-opus-4-6", "claude-haiku-4-5-20251001"] },
+  pro: {
+    aiGenerations: Infinity,
+    modelAccess: [
+      "gemini-1.5-flash",
+      "gemini-2.5-flash",
+      "gpt-4o",
+      "gpt-4o-mini",
+      "claude-sonnet-4-6",
+      "claude-haiku-4-5-20251001",
+    ],
+  },
+  annual: {
+    aiGenerations: Infinity,
+    modelAccess: [
+      "gemini-1.5-flash",
+      "gemini-2.5-flash",
+      "gpt-4o",
+      "gpt-4o-mini",
+      "claude-sonnet-4-6",
+      "claude-opus-4-6",
+      "claude-haiku-4-5-20251001",
+    ],
+  },
 };
 
 function loadPlan(): UserPlan {
@@ -107,7 +294,9 @@ function loadPlan(): UserPlan {
   return { tier: "free", creditsUsed: 0, creditsTotal: 20, creditsExtra: 0 };
 }
 function savePlan(plan: UserPlan) {
-  try { localStorage.setItem(PLAN_LS_KEY, JSON.stringify(plan)); } catch {}
+  try {
+    localStorage.setItem(PLAN_LS_KEY, JSON.stringify(plan));
+  } catch {}
 }
 
 // ── Store interface ────────────────────────────────────────────────────────────
@@ -117,8 +306,13 @@ interface CombinedStore {
   token: string | null;
   loading: boolean;
   bootstrapAuth: () => void;
-  signInWithGoogle: (credential: string, userInfo?: { sub: string; email: string; name?: string; picture?: string }) => Promise<void>;
-  refreshUser: () => Promise<void>;
+  signInWithGoogle: (
+    credential: string,
+    userInfo?: { sub: string; email: string; name?: string; picture?: string },
+  ) => Promise<void>;
+  setAuthLoading: (loading: boolean) => void;
+  applyServerUser: (data: Record<string, unknown>) => void;
+  markAuthFallback: () => void;
   signOut: () => Promise<void>;
 
   // Plan & Credits
@@ -152,14 +346,25 @@ interface CombinedStore {
   onEdgesChange: (changes: EdgeChange[]) => void;
   onConnect: (connection: Connection) => void;
   onEdgeUpdate: (oldEdge: PipelineEdge, newConnection: Connection) => void;
-  updateNodeField: (nodeId: string, fieldName: string, fieldValue: unknown) => void;
-  updateNodeCredential: (nodeId: string, credKey: string, encryptedValue: string) => void;
+  updateNodeField: (
+    nodeId: string,
+    fieldName: string,
+    fieldValue: unknown,
+  ) => void;
+  updateNodeCredential: (
+    nodeId: string,
+    credKey: string,
+    encryptedValue: string,
+  ) => void;
   deleteNode: (nodeId: string) => void;
   addNodeHandle: (nodeId: string, handle: HandleConfig) => void;
   removeNodeHandle: (nodeId: string, handleId: string) => void;
   deleteEdge: (edgeId: string) => void;
   updateEdgeLabel: (edgeId: string, label: string) => void;
-  updateEdgeStyle: (edgeId: string, style: { color?: string; variant?: "solid" | "dashed" }) => void;
+  updateEdgeStyle: (
+    edgeId: string,
+    style: { color?: string; variant?: "solid" | "dashed" },
+  ) => void;
   clearCanvas: () => void;
   loadDemo: () => void;
   applyGeneratedGraph: (nodes: PipelineNode[], edges: PipelineEdge[]) => void;
@@ -187,7 +392,10 @@ interface CombinedStore {
   currentRun: ExecutionRun | null;
   executionHistory: ExecutionRun[];
   setCurrentRun: (run: ExecutionRun | null) => void;
-  updateRunResult: (nodeId: string, state: "running" | "success" | "failed" | "skipped") => void;
+  updateRunResult: (
+    nodeId: string,
+    state: "running" | "success" | "failed" | "skipped",
+  ) => void;
   addExecutionRun: (run: ExecutionRun) => void;
   clearExecution: () => void;
 
@@ -209,9 +417,18 @@ interface CombinedStore {
   setShowPricingModal: (v: boolean, tab?: "plans" | "credits") => void;
 }
 
+type PersistedStoreState = Pick<
+  CombinedStore,
+  "theme" | "nodes" | "edges" | "nodeIDs" | "selectedNodeId" | "rightPanelMode"
+>;
+
 // ── Edge factory ──────────────────────────────────────────────────────────────
 export function makeEdge(
-  overrides: Partial<PipelineEdge> & { id: string; source: string; target: string }
+  overrides: Partial<PipelineEdge> & {
+    id: string;
+    source: string;
+    target: string;
+  },
 ): PipelineEdge {
   return {
     type: "smoothstep",
@@ -222,56 +439,161 @@ export function makeEdge(
   };
 }
 
-const API_URL = () => (import.meta.env.VITE_API_URL as string) || "http://localhost:8000";
+const API_URL = () =>
+  (import.meta.env.VITE_API_URL as string) || "http://localhost:8000";
+const applyTheme = (theme: "dark" | "light") => {
+  if (typeof document !== "undefined") {
+    document.body?.setAttribute("data-theme", theme);
+  }
+};
 
 // ── Store ─────────────────────────────────────────────────────────────────────
-export const useStore = create<CombinedStore>((set, get) => ({
+export const useStore = create<CombinedStore>()(
+  persist(
+    (set, get) => ({
   // ── Auth ──────────────────────────────────────────────────────────────────
   user: null,
   token: null,
   loading: isGoogleConfigured,
 
   bootstrapAuth: () => {
-    if (!isGoogleConfigured) { set({ loading: false }); return; }
+    if (!isGoogleConfigured) {
+      set({ loading: false });
+      return;
+    }
     const stored = loadToken();
-    if (!stored) { set({ loading: false }); return; }
+    if (!stored) {
+      set({ loading: false });
+      return;
+    }
     try {
       const payload = decodeJwtPayload<GooglePayload>(stored);
-      set({ user: { id: 0, email: payload.email, name: payload.name ?? null, avatar_url: payload.picture ?? null, is_admin: false, is_premium: false, has_api_key: false }, token: stored, loading: false });
-      void get().refreshUser();
-    } catch { clearToken(); set({ loading: false }); }
+      saveCachedProfile({
+        sub: payload.sub,
+        email: payload.email,
+        name: payload.name ?? null,
+        picture: payload.picture ?? null,
+      });
+      set({
+        user: {
+          id: 0,
+          email: payload.email,
+          name: payload.name ?? null,
+          avatar_url: payload.picture ?? null,
+          is_admin: false,
+          is_premium: false,
+          has_api_key: false,
+        },
+        token: stored,
+        loading: true,
+      });
+    } catch {
+      const cached = loadCachedProfile();
+      if (!cached?.email) {
+        clearToken();
+        set({ loading: false, user: null, token: null });
+        return;
+      }
+      set({
+        user: {
+          id: 0,
+          email: cached.email,
+          name: cached.name ?? null,
+          avatar_url: cached.picture ?? null,
+          is_admin: false,
+          is_premium: false,
+          has_api_key: false,
+        },
+        token: stored,
+        loading: true,
+      });
+    }
   },
 
   signInWithGoogle: async (credential, userInfo) => {
     saveToken(credential);
-    let email = "", name: string | null = null, picture: string | null = null;
-    if (userInfo) { email = userInfo.email; name = userInfo.name ?? null; picture = userInfo.picture ?? null; }
-    else {
-      try { const p = decodeJwtPayload<GooglePayload>(credential); email = p.email; name = p.name ?? null; picture = p.picture ?? null; } catch {}
+    let email = "",
+      name: string | null = null,
+      picture: string | null = null;
+    if (userInfo) {
+      email = userInfo.email;
+      name = userInfo.name ?? null;
+      picture = userInfo.picture ?? null;
+    } else {
+      try {
+        const p = decodeJwtPayload<GooglePayload>(credential);
+        email = p.email;
+        name = p.name ?? null;
+        picture = p.picture ?? null;
+      } catch {}
     }
-    set({ user: { id: 0, email, name, avatar_url: picture, is_admin: false, is_premium: false, has_api_key: false }, token: credential, loading: false });
-    await get().refreshUser();
+    set({
+      user: {
+        id: 0,
+        email,
+        name,
+        avatar_url: picture,
+        is_admin: false,
+        is_premium: false,
+        has_api_key: false,
+      },
+      token: credential,
+      loading: true,
+    });
+    if (email) {
+      saveCachedProfile({
+        sub: userInfo?.sub,
+        email,
+        name,
+        picture,
+      });
+    }
   },
 
-  refreshUser: async () => {
-    const { token } = get();
-    if (!token) return;
-    try {
-      const r = await fetch(`${API_URL()}/auth/me`, { headers: { Authorization: `Bearer ${token}` } });
-      if (!r.ok) { const { user } = get(); if (user) set({ user: { ...user, has_api_key: true } }); return; }
-      const data = await r.json() as Record<string, unknown>;
-      set({ user: { id: (data.id as number) ?? 0, email: (data.email as string) ?? "", name: (data.name as string | null) ?? null, avatar_url: (data.avatar_url as string | null) ?? null, is_admin: (data.is_admin as boolean) ?? false, is_premium: (data.is_premium as boolean) ?? false, has_api_key: (data.has_api_key as boolean) ?? false } });
-    } catch { const { user } = get(); if (user) set({ user: { ...user, has_api_key: true } }); }
+  setAuthLoading: (loading) => set({ loading }),
+
+  applyServerUser: (data) => {
+    set({
+      user: {
+        id: (data.id as number) ?? 0,
+        email: (data.email as string) ?? "",
+        name: (data.name as string | null) ?? null,
+        avatar_url: (data.avatar_url as string | null) ?? null,
+        is_admin: (data.is_admin as boolean) ?? false,
+        is_premium: (data.is_premium as boolean) ?? false,
+        has_api_key: (data.has_api_key as boolean) ?? false,
+      },
+    });
   },
 
-  signOut: async () => { clearToken(); googleLogout(); set({ user: null, token: null }); },
+  markAuthFallback: () => {
+    const { user } = get();
+    if (user) set({ user: { ...user, has_api_key: true } });
+  },
+
+  signOut: async () => {
+    clearToken();
+    clearCachedProfile();
+    googleLogout();
+    set({ user: null, token: null, loading: false });
+  },
 
   // ── Plan & Credits ────────────────────────────────────────────────────────
   plan: loadPlan(),
 
   setPlan: (tier, extraCredits = 0) => {
-    const plan: UserPlan = { tier, creditsUsed: 0, creditsTotal: tier === "free" ? 20 : Infinity, creditsExtra: extraCredits, renewsAt: tier !== "free" ? new Date(Date.now() + 30 * 24 * 3600_000).toISOString() : undefined };
-    savePlan(plan); set({ plan });
+    const plan: UserPlan = {
+      tier,
+      creditsUsed: 0,
+      creditsTotal: tier === "free" ? 20 : Infinity,
+      creditsExtra: extraCredits,
+      renewsAt:
+        tier !== "free"
+          ? new Date(Date.now() + 30 * 24 * 3600_000).toISOString()
+          : undefined,
+    };
+    savePlan(plan);
+    set({ plan });
   },
 
   consumeCredit: () => {
@@ -280,43 +602,71 @@ export const useStore = create<CombinedStore>((set, get) => ({
     const available = plan.creditsTotal + plan.creditsExtra - plan.creditsUsed;
     if (available <= 0) return false;
     const updated = { ...plan, creditsUsed: plan.creditsUsed + 1 };
-    savePlan(updated); set({ plan: updated }); return true;
+    savePlan(updated);
+    set({ plan: updated });
+    return true;
   },
 
   addExtraCredits: (amount) => {
     const { plan } = get();
     const updated = { ...plan, creditsExtra: plan.creditsExtra + amount };
-    savePlan(updated); set({ plan: updated });
+    savePlan(updated);
+    set({ plan: updated });
   },
 
   // ── Theme ─────────────────────────────────────────────────────────────────
   theme: "dark",
   toggleTheme: () => {
     const next = get().theme === "dark" ? "light" : "dark";
-    set({ theme: next }); document.body.setAttribute("data-theme", next);
+    set({ theme: next });
+    applyTheme(next);
   },
 
   // ── Canvas ────────────────────────────────────────────────────────────────
   nodes: demoNodes,
   edges: demoEdges,
   nodeIDs: { customInput: 1, text: 1, llm: 1, customOutput: 1 },
-  pastNodes: [], pastEdges: [], futureNodes: [], futureEdges: [],
+  pastNodes: [],
+  pastEdges: [],
+  futureNodes: [],
+  futureEdges: [],
 
   takeSnapshot: () => {
     const { nodes, edges, pastNodes, pastEdges } = get();
-    set({ pastNodes: [...pastNodes.slice(-49), [...nodes]], pastEdges: [...pastEdges.slice(-49), [...edges]], futureNodes: [], futureEdges: [] });
+    set({
+      pastNodes: [...pastNodes.slice(-49), [...nodes]],
+      pastEdges: [...pastEdges.slice(-49), [...edges]],
+      futureNodes: [],
+      futureEdges: [],
+    });
   },
 
   undo: () => {
-    const { nodes, edges, pastNodes, pastEdges, futureNodes, futureEdges } = get();
+    const { nodes, edges, pastNodes, pastEdges, futureNodes, futureEdges } =
+      get();
     if (!pastNodes.length) return;
-    set({ nodes: pastNodes[pastNodes.length - 1], edges: pastEdges[pastEdges.length - 1], pastNodes: pastNodes.slice(0, -1), pastEdges: pastEdges.slice(0, -1), futureNodes: [[...nodes], ...futureNodes.slice(0, 49)], futureEdges: [[...edges], ...futureEdges.slice(0, 49)] });
+    set({
+      nodes: pastNodes[pastNodes.length - 1],
+      edges: pastEdges[pastEdges.length - 1],
+      pastNodes: pastNodes.slice(0, -1),
+      pastEdges: pastEdges.slice(0, -1),
+      futureNodes: [[...nodes], ...futureNodes.slice(0, 49)],
+      futureEdges: [[...edges], ...futureEdges.slice(0, 49)],
+    });
   },
 
   redo: () => {
-    const { nodes, edges, pastNodes, pastEdges, futureNodes, futureEdges } = get();
+    const { nodes, edges, pastNodes, pastEdges, futureNodes, futureEdges } =
+      get();
     if (!futureNodes.length) return;
-    set({ nodes: futureNodes[0], edges: futureEdges[0], pastNodes: [...pastNodes.slice(-49), [...nodes]], pastEdges: [...pastEdges.slice(-49), [...edges]], futureNodes: futureNodes.slice(1), futureEdges: futureEdges.slice(1) });
+    set({
+      nodes: futureNodes[0],
+      edges: futureEdges[0],
+      pastNodes: [...pastNodes.slice(-49), [...nodes]],
+      pastEdges: [...pastEdges.slice(-49), [...edges]],
+      futureNodes: futureNodes.slice(1),
+      futureEdges: futureEdges.slice(1),
+    });
   },
 
   getNodeID: (type) => {
@@ -333,13 +683,27 @@ export const useStore = create<CombinedStore>((set, get) => ({
     setTimeout(() => get().runValidation(), 0);
   },
 
-  onNodesChange: (changes) => { set({ nodes: applyNodeChanges(changes, get().nodes) as PipelineNode[] }); },
+  onNodesChange: (changes) => {
+    set({ nodes: applyNodeChanges(changes, get().nodes) as PipelineNode[] });
+  },
 
-  onEdgesChange: (changes) => { set({ edges: applyEdgeChanges(changes, get().edges) as PipelineEdge[] }); },
+  onEdgesChange: (changes) => {
+    set({ edges: applyEdgeChanges(changes, get().edges) as PipelineEdge[] });
+  },
 
   onConnect: (connection) => {
     get().takeSnapshot();
-    set({ edges: addEdge(makeEdge({ ...connection, id: `e-${Date.now()}`, source: connection.source ?? "", target: connection.target ?? "" }), get().edges) as PipelineEdge[] });
+    set({
+      edges: addEdge(
+        makeEdge({
+          ...connection,
+          id: `e-${Date.now()}`,
+          source: connection.source ?? "",
+          target: connection.target ?? "",
+        }),
+        get().edges,
+      ) as PipelineEdge[],
+    });
   },
 
   // Edge reconnection — drag an edge endpoint to a different node
@@ -361,52 +725,130 @@ export const useStore = create<CombinedStore>((set, get) => ({
 
   updateNodeField: (nodeId, fieldName, fieldValue) => {
     get().takeSnapshot();
-    set({ nodes: get().nodes.map((n) => n.id === nodeId ? { ...n, data: { ...n.data, [fieldName]: fieldValue } } : n) });
+    set({
+      nodes: get().nodes.map((n) =>
+        n.id === nodeId
+          ? { ...n, data: { ...n.data, [fieldName]: fieldValue } }
+          : n,
+      ),
+    });
   },
 
   updateNodeCredential: (nodeId, credKey, encryptedValue) => {
     set({
       nodes: get().nodes.map((n) =>
         n.id === nodeId
-          ? { ...n, data: { ...n.data, credentials: { ...(n.data.credentials ?? {}), [credKey]: encryptedValue } } }
-          : n
+          ? {
+              ...n,
+              data: {
+                ...n.data,
+                credentials: {
+                  ...(n.data.credentials ?? {}),
+                  [credKey]: encryptedValue,
+                },
+              },
+            }
+          : n,
       ),
     });
   },
 
   deleteNode: (nodeId) => {
     get().takeSnapshot();
-    set({ nodes: get().nodes.filter((n) => n.id !== nodeId), edges: get().edges.filter((e) => e.source !== nodeId && e.target !== nodeId) });
+    set({
+      nodes: get().nodes.filter((n) => n.id !== nodeId),
+      edges: get().edges.filter(
+        (e) => e.source !== nodeId && e.target !== nodeId,
+      ),
+    });
   },
 
   addNodeHandle: (nodeId, handle) => {
     get().takeSnapshot();
-    set({ nodes: get().nodes.map((n) => n.id === nodeId ? { ...n, data: { ...n.data, customHandles: [...((n.data.customHandles as HandleConfig[] | undefined) ?? []), handle] } } : n) });
+    set({
+      nodes: get().nodes.map((n) =>
+        n.id === nodeId
+          ? {
+              ...n,
+              data: {
+                ...n.data,
+                customHandles: [
+                  ...((n.data.customHandles as HandleConfig[] | undefined) ??
+                    []),
+                  handle,
+                ],
+              },
+            }
+          : n,
+      ),
+    });
   },
 
   removeNodeHandle: (nodeId, handleId) => {
     get().takeSnapshot();
     const fullId = `${nodeId}-${handleId}`;
     set({
-      nodes: get().nodes.map((n) => n.id === nodeId ? { ...n, data: { ...n.data, customHandles: ((n.data.customHandles as HandleConfig[] | undefined) ?? []).filter((h) => h.id !== handleId) } } : n),
-      edges: get().edges.filter((e) => e.sourceHandle !== fullId && e.targetHandle !== fullId),
+      nodes: get().nodes.map((n) =>
+        n.id === nodeId
+          ? {
+              ...n,
+              data: {
+                ...n.data,
+                customHandles: (
+                  (n.data.customHandles as HandleConfig[] | undefined) ?? []
+                ).filter((h) => h.id !== handleId),
+              },
+            }
+          : n,
+      ),
+      edges: get().edges.filter(
+        (e) => e.sourceHandle !== fullId && e.targetHandle !== fullId,
+      ),
     });
   },
 
-  deleteEdge: (edgeId) => { get().takeSnapshot(); set({ edges: get().edges.filter((e) => e.id !== edgeId) }); },
+  deleteEdge: (edgeId) => {
+    get().takeSnapshot();
+    set({ edges: get().edges.filter((e) => e.id !== edgeId) });
+  },
 
   updateEdgeLabel: (edgeId, label) => {
     get().takeSnapshot();
-    set({ edges: get().edges.map((e) => e.id === edgeId ? { ...e, label: label || undefined } : e) });
+    set({
+      edges: get().edges.map((e) =>
+        e.id === edgeId ? { ...e, label: label || undefined } : e,
+      ),
+    });
   },
 
   updateEdgeStyle: (edgeId, style) => {
     get().takeSnapshot();
-    set({ edges: get().edges.map((e) => e.id === edgeId ? { ...e, data: { ...(e.data ?? {}), edgeColor: style.color ?? e.data?.edgeColor, edgeVariant: style.variant ?? (e.data as Record<string,unknown>)?.edgeVariant } } : e) });
+    set({
+      edges: get().edges.map((e) =>
+        e.id === edgeId
+          ? {
+              ...e,
+              data: {
+                ...(e.data ?? {}),
+                edgeColor: style.color ?? e.data?.edgeColor,
+                edgeVariant:
+                  style.variant ??
+                  (e.data as Record<string, unknown>)?.edgeVariant,
+              },
+            }
+          : e,
+      ),
+    });
   },
 
-  clearCanvas: () => { get().takeSnapshot(); set({ nodes: [], edges: [], selectedNodeId: null }); },
-  loadDemo: () => { get().takeSnapshot(); set({ nodes: demoNodes, edges: demoEdges }); },
+  clearCanvas: () => {
+    get().takeSnapshot();
+    set({ nodes: [], edges: [], selectedNodeId: null });
+  },
+  loadDemo: () => {
+    get().takeSnapshot();
+    set({ nodes: demoNodes, edges: demoEdges });
+  },
 
   applyGeneratedGraph: (nodes, edges) => {
     get().takeSnapshot();
@@ -426,10 +868,29 @@ export const useStore = create<CombinedStore>((set, get) => ({
     const { nodes, edges, token } = get();
     const wfName = name.trim() || "Untitled";
     const list = readSavedWorkflows();
-    list.unshift({ id: `wf-${Date.now()}`, name: wfName, savedAt: new Date().toISOString(), nodeCount: nodes.length, edgeCount: edges.length, nodes: JSON.parse(JSON.stringify(nodes)), edges: JSON.parse(JSON.stringify(edges)) });
+    list.unshift({
+      id: `wf-${Date.now()}`,
+      name: wfName,
+      savedAt: new Date().toISOString(),
+      nodeCount: nodes.length,
+      edgeCount: edges.length,
+      nodes: JSON.parse(JSON.stringify(nodes)),
+      edges: JSON.parse(JSON.stringify(edges)),
+    });
     writeSavedWorkflows(list.slice(0, 50));
     if (!token) return;
-    void fetch(`${API_URL()}/pipelines`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: wfName, description: null, graph: { nodes, edges } }) }).catch(() => {});
+    void fetch(`${API_URL()}/pipelines`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        name: wfName,
+        description: null,
+        graph: { nodes, edges },
+      }),
+    }).catch(() => {});
   },
 
   getSavedWorkflows: () => readSavedWorkflows(),
@@ -441,19 +902,26 @@ export const useStore = create<CombinedStore>((set, get) => ({
     set({ nodes: wf.nodes, edges: wf.edges });
   },
 
-  deleteSavedWorkflow: (id) => { writeSavedWorkflows(readSavedWorkflows().filter((w) => w.id !== id)); },
+  deleteSavedWorkflow: (id) => {
+    writeSavedWorkflows(readSavedWorkflows().filter((w) => w.id !== id));
+  },
 
-  exportToJSON: () => JSON.stringify({ nodes: get().nodes, edges: get().edges }, null, 2),
+  exportToJSON: () =>
+    JSON.stringify({ nodes: get().nodes, edges: get().edges }, null, 2),
 
   importFromJSON: (json) => {
     try {
       const parsed = JSON.parse(json);
-      if (!Array.isArray(parsed.nodes) || !Array.isArray(parsed.edges)) return { ok: false, error: "Expected { nodes, edges }" };
+      if (!Array.isArray(parsed.nodes) || !Array.isArray(parsed.edges))
+        return { ok: false, error: "Expected { nodes, edges }" };
       get().takeSnapshot();
       set({ nodes: parsed.nodes, edges: parsed.edges });
       return { ok: true };
     } catch (e) {
-      return { ok: false, error: e instanceof Error ? e.message : "Parse error" };
+      return {
+        ok: false,
+        error: e instanceof Error ? e.message : "Parse error",
+      };
     }
   },
 
@@ -511,7 +979,9 @@ export const useStore = create<CombinedStore>((set, get) => ({
   updateRunResult: (nodeId, state) => {
     set({
       nodes: get().nodes.map((n) =>
-        n.id === nodeId ? { ...n, data: { ...n.data, executionState: state } } : n
+        n.id === nodeId
+          ? { ...n, data: { ...n.data, executionState: state } }
+          : n,
       ),
     });
   },
@@ -523,7 +993,16 @@ export const useStore = create<CombinedStore>((set, get) => ({
   clearExecution: () => {
     set({
       currentRun: null,
-      nodes: get().nodes.map((n) => ({ ...n, data: { ...n.data, executionState: undefined, executionLog: undefined, executionDuration: undefined, tokenUsage: undefined } })),
+      nodes: get().nodes.map((n) => ({
+        ...n,
+        data: {
+          ...n.data,
+          executionState: undefined,
+          executionLog: undefined,
+          executionDuration: undefined,
+          tokenUsage: undefined,
+        },
+      })),
     });
   },
 
@@ -538,7 +1017,10 @@ export const useStore = create<CombinedStore>((set, get) => ({
   pricingTab: "plans",
 
   setSelectedNode: (nodeId) => {
-    set({ selectedNodeId: nodeId, rightPanelMode: nodeId ? "node-config" : "chat" });
+    set({
+      selectedNodeId: nodeId,
+      rightPanelMode: nodeId ? "node-config" : "chat",
+    });
   },
 
   setRightPanelMode: (mode) => set({ rightPanelMode: mode }),
@@ -546,7 +1028,27 @@ export const useStore = create<CombinedStore>((set, get) => ({
   setShowExecutionPanel: (v) => set({ showExecutionPanel: v }),
   setShowExportModal: (v) => set({ showExportModal: v }),
   setShowVersionHistory: (v) => set({ showVersionHistory: v }),
-  setShowPricingModal: (v, tab) => set({ showPricingModal: v, ...(tab ? { pricingTab: tab } : {}) }),
-}));
+  setShowPricingModal: (v, tab) =>
+    set({ showPricingModal: v, ...(tab ? { pricingTab: tab } : {}) }),
+    }),
+    {
+      name: STORE_KEY,
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state): PersistedStoreState => ({
+        theme: state.theme,
+        nodes: state.nodes,
+        edges: state.edges,
+        nodeIDs: state.nodeIDs,
+        selectedNodeId: state.selectedNodeId,
+        rightPanelMode: state.rightPanelMode,
+      }),
+      onRehydrateStorage: () => (state) => {
+        if (!state) return;
+        applyTheme(state.theme);
+        state.runValidation();
+      },
+    },
+  ),
+);
 
-export type { UserPlan, PlanTier, ExportProjectType };
+export type { ExportProjectType, PlanTier, UserPlan };

@@ -15,11 +15,14 @@ import { VersionHistory } from "./components/modals/VersionHistory";
 import { PipelineToolbar } from "./components/sidebar/Toolbar";
 import { IntegratedBottomBar } from "./components/ui/IntegratedBottomBar";
 import { KeyboardHelp } from "./components/ui/KeyboardHelp";
+import { useAuthMeSync } from "./hooks/useAuthMeSync";
 import { GOOGLE_CLIENT_ID, isGoogleConfigured } from "./lib/google-auth";
 import { useStore } from "./store";
+import { shallow } from "zustand/shallow";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, loading } = useStore();
+  const user = useStore((s) => s.user);
+  const loading = useStore((s) => s.loading);
 
   if (loading) {
     return (
@@ -42,15 +45,29 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const App: React.FC = () => {
+  useAuthMeSync();
   const [chatOpen, setChatOpen] = useState(false);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
-  const theme = useStore((s) => s.theme);
-  const undo = useStore((s) => s.undo);
-  const redo = useStore((s) => s.redo);
-  const setSelectedNode = useStore((s) => s.setSelectedNode);
-  const selectedNodeId = useStore((s) => s.selectedNodeId);
-  const applyAutoLayout = useStore((s) => s.applyAutoLayout);
-  const setRightPanelMode = useStore((s) => s.setRightPanelMode);
+  const {
+    theme,
+    undo,
+    redo,
+    setSelectedNode,
+    selectedNodeId,
+    applyAutoLayout,
+    setRightPanelMode,
+  } = useStore(
+    (s) => ({
+      theme: s.theme,
+      undo: s.undo,
+      redo: s.redo,
+      setSelectedNode: s.setSelectedNode,
+      selectedNodeId: s.selectedNodeId,
+      applyAutoLayout: s.applyAutoLayout,
+      setRightPanelMode: s.setRightPanelMode,
+    }),
+    shallow,
+  );
 
   useEffect(() => {
     document.body.setAttribute("data-theme", theme);

@@ -2,6 +2,7 @@
 // Stores the Google ID token in localStorage for session persistence.
 
 const TOKEN_KEY = "aura_google_token";
+const PROFILE_KEY = "aura_google_profile";
 
 export const GOOGLE_CLIENT_ID = import.meta.env.GOOGLE_CLIENT_ID ?? "";
 
@@ -30,6 +31,13 @@ export interface GooglePayload {
   exp: number;
 }
 
+export interface CachedGoogleProfile {
+  sub?: string;
+  email: string;
+  name?: string | null;
+  picture?: string | null;
+}
+
 /** Persist a Google ID token to localStorage. */
 export function saveToken(credential: string): void {
   localStorage.setItem(TOKEN_KEY, credential);
@@ -40,19 +48,41 @@ export function loadToken(): string | null {
   const token = localStorage.getItem(TOKEN_KEY);
   if (!token) return null;
   try {
-    const { exp } = decodeJwtPayload<GooglePayload>(token);
-    if (Date.now() / 1000 > exp) {
+    const { exp } = decodeJwtPayload<Partial<GooglePayload>>(token);
+    if (typeof exp === "number" && Date.now() / 1000 > exp) {
       localStorage.removeItem(TOKEN_KEY);
       return null;
     }
-    return token;
   } catch {
-    localStorage.removeItem(TOKEN_KEY);
-    return null;
+    // Non-JWT Google access tokens cannot be decoded client-side for exp checks.
   }
+  return token;
 }
 
 /** Clear the stored token. */
 export function clearToken(): void {
   localStorage.removeItem(TOKEN_KEY);
+}
+
+/** Persist a minimal profile for bootstrap when token is not a JWT. */
+export function saveCachedProfile(profile: CachedGoogleProfile): void {
+  localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+}
+
+/** Read cached profile, if available. */
+export function loadCachedProfile(): CachedGoogleProfile | null {
+  const raw = localStorage.getItem(PROFILE_KEY);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as CachedGoogleProfile;
+    if (!parsed?.email) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+/** Clear cached profile. */
+export function clearCachedProfile(): void {
+  localStorage.removeItem(PROFILE_KEY);
 }
