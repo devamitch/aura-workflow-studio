@@ -3,14 +3,15 @@
 
 const TOKEN_KEY = "aura_google_token";
 
-export const GOOGLE_CLIENT_ID =
-  import.meta.env.VITE_GOOGLE_CLIENT_ID ?? "";
+export const GOOGLE_CLIENT_ID = import.meta.env.GOOGLE_CLIENT_ID ?? "";
 
 /** True if a Google Client ID is configured. */
 export const isGoogleConfigured = Boolean(GOOGLE_CLIENT_ID);
 
 /** Decode a JWT payload without verifying the signature (client-side only). */
-export function decodeJwtPayload<T = Record<string, unknown>>(token: string): T {
+export function decodeJwtPayload<T = Record<string, unknown>>(
+  token: string,
+): T {
   const base64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
   const json = decodeURIComponent(
     atob(base64)

@@ -1,4 +1,3 @@
-import React, { useEffect, useRef, useState } from "react";
 import {
   Bot,
   ChevronDown,
@@ -13,11 +12,12 @@ import {
   User as UserIcon,
   Wand2,
 } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
 import { useStore } from "../../store";
 import type { PipelineEdge, PipelineNode } from "../../types";
 
 // ── Gemini direct API ─────────────────────────────────────────────────────────
-const GEMINI_KEY = import.meta.env.VITE_GEMINI_KEY ?? "";
+const GEMINI_KEY = import.meta.env.GEMINI_KEY ?? "";
 const GEMINI_MODEL = "gemini-1.5-flash";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:streamGenerateContent?alt=sse&key=${GEMINI_KEY}`;
 
@@ -47,11 +47,9 @@ interface GeminiMessage {
   parts: { text: string }[];
 }
 
-async function* streamGemini(
-  history: GeminiMessage[],
-): AsyncGenerator<string> {
+async function* streamGemini(history: GeminiMessage[]): AsyncGenerator<string> {
   if (!GEMINI_KEY) {
-    yield "⚠️ No Gemini API key configured. Add VITE_GEMINI_KEY to your .env file.";
+    yield "⚠️ No Gemini API key configured. Add GEMINI_KEY to your .env file.";
     return;
   }
 
@@ -137,10 +135,7 @@ const TaskListView: React.FC<{
 
   return (
     <div className="task-list-view">
-      <div
-        className="task-list-header"
-        onClick={() => setCollapsed((v) => !v)}
-      >
+      <div className="task-list-header" onClick={() => setCollapsed((v) => !v)}>
         <span className="task-list-title">
           <GitBranch size={12} />
           Task Plan
@@ -257,12 +252,16 @@ export const AIPromptChat: React.FC<Props> = ({ embedded }) => {
     if (!text || streaming) return;
     // Credit gate for free plan
     if (!consumeCredit()) {
-      setMessages((prev) => [...prev, {
-        id: `limit-${Date.now()}`,
-        role: "assistant" as const,
-        content: "⚠️ You've used all **20 free credits** this month. Upgrade to Pro for unlimited AI generations!",
-        timestamp: new Date().toISOString(),
-      }]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `limit-${Date.now()}`,
+          role: "assistant" as const,
+          content:
+            "⚠️ You've used all **20 free credits** this month. Upgrade to Pro for unlimited AI generations!",
+          timestamp: new Date().toISOString(),
+        },
+      ]);
       return;
     }
 
@@ -293,9 +292,7 @@ export const AIPromptChat: React.FC<Props> = ({ embedded }) => {
       for await (const chunk of streamGemini(history)) {
         fullText += chunk;
         setMessages((prev) =>
-          prev.map((m) =>
-            m.id === botId ? { ...m, content: fullText } : m,
-          ),
+          prev.map((m) => (m.id === botId ? { ...m, content: fullText } : m)),
         );
       }
 
@@ -377,7 +374,8 @@ export const AIPromptChat: React.FC<Props> = ({ embedded }) => {
         ),
       );
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Graph generation failed";
+      const msg =
+        err instanceof Error ? err.message : "Graph generation failed";
       setMessages((prev) =>
         prev.map((m) =>
           m.id === botId
@@ -430,9 +428,10 @@ export const AIPromptChat: React.FC<Props> = ({ embedded }) => {
     !lastMsg.isStreaming;
 
   const hasVoice =
-    typeof window !== "undefined" &&
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    !!(window as any).SpeechRecognition || !!(window as any).webkitSpeechRecognition;
+    (typeof window !== "undefined" &&
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      !!(window as any).SpeechRecognition) ||
+    !!(window as any).webkitSpeechRecognition;
 
   return (
     <div className={`ai-chat-container${embedded ? " embedded" : ""}`}>
@@ -531,7 +530,7 @@ export const AIPromptChat: React.FC<Props> = ({ embedded }) => {
         </div>
         {!GEMINI_KEY && (
           <p className="chat-no-key-warning">
-            ⚠️ Add VITE_GEMINI_KEY to .env to enable AI chat
+            ⚠️ Add GEMINI_KEY to .env to enable AI chat
           </p>
         )}
       </div>
