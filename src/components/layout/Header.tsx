@@ -4,6 +4,7 @@ import {
   Download,
   FilePlus,
   FolderOpen,
+  GitBranch,
   LayoutDashboard,
   LogOut,
   Moon,
@@ -12,6 +13,7 @@ import {
   Settings,
   Sun,
   Upload,
+  Wand2,
   Zap,
 } from "lucide-react";
 import React, { useRef, useState } from "react";
@@ -21,36 +23,39 @@ import { PricingModal } from "../ui/PricingModal";
 
 export const Header: React.FC = () => {
   const [showWorkflowsModal, setShowWorkflowsModal] = useState(false);
-  const [showPricingModal, setShowPricingModal] = useState(false);
-  const [pricingTab, setPricingTab] = useState<"plans" | "credits">("plans");
   const [savePrompt, setSavePrompt] = useState(false);
   const [saveName, setSaveName] = useState("");
   const [showUserMenu, setShowUserMenu] = useState(false);
   const saveInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const {
-    theme,
-    toggleTheme,
-    user,
-    signOut,
-    clearCanvas,
-    loadDemo,
-    saveWorkflow,
-    exportToJSON,
-    importFromJSON,
-    applyAutoLayout,
-  } = useStore();
-
+  const theme = useStore((s) => s.theme);
+  const toggleTheme = useStore((s) => s.toggleTheme);
+  const user = useStore((s) => s.user);
+  const signOut = useStore((s) => s.signOut);
+  const clearCanvas = useStore((s) => s.clearCanvas);
+  const loadDemo = useStore((s) => s.loadDemo);
+  const saveWorkflow = useStore((s) => s.saveWorkflow);
+  const exportToJSON = useStore((s) => s.exportToJSON);
+  const importFromJSON = useStore((s) => s.importFromJSON);
+  const applyAutoLayout = useStore((s) => s.applyAutoLayout);
   const nodes = useStore((s) => s.nodes);
   const edges = useStore((s) => s.edges);
   const plan = useStore((s) => s.plan);
+  const showPricingModal = useStore((s) => s.showPricingModal);
+  const pricingTab = useStore((s) => s.pricingTab);
+  const setShowPricingModal = useStore((s) => s.setShowPricingModal);
+  const setShowIntentOrchestrator = useStore(
+    (s) => s.setShowIntentOrchestrator,
+  );
+  const setShowExecutionPanel = useStore((s) => s.setShowExecutionPanel);
+  const setShowExportModal = useStore((s) => s.setShowExportModal);
+  const setShowVersionHistory = useStore((s) => s.setShowVersionHistory);
 
   const creditsLeft =
     plan.tier === "free"
       ? Math.max(0, plan.creditsTotal + plan.creditsExtra - plan.creditsUsed)
       : null;
-
   const creditsPercent =
     plan.tier === "free" ? (plan.creditsUsed / plan.creditsTotal) * 100 : 0;
 
@@ -60,7 +65,7 @@ export const Header: React.FC = () => {
     setSaveName("");
   };
 
-  const handleExport = () => {
+  const handleExportJSON = () => {
     const json = exportToJSON();
     const blob = new Blob([json], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -84,44 +89,45 @@ export const Header: React.FC = () => {
   };
 
   const displayName =
-    user?.name?.split(" ")[0] || user?.email?.split("@")[0] || "User";
+    user?.name?.split(" ")[0] ?? user?.email?.split("@")[0] ?? "User";
 
   return (
     <>
       <header className="app-header">
         {/* Brand */}
         <div className="header-brand">
-          <div
-            className="header-logo-mark"
-            style={{
-              overflow: "hidden",
-              padding: 0,
-              width: 24,
-              height: 24,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
+          <div className="header-logo-mark">
             <img
               src="/app-icon.png"
-              alt="AuraStudio"
+              alt="Aura Engine"
               style={{
                 width: "100%",
                 height: "100%",
                 objectFit: "cover",
-                borderRadius: "6px",
+                borderRadius: 6,
               }}
             />
           </div>
           <span className="header-logo-text">
             Aura <span>Studio</span>
           </span>
-          <span className="header-badge">BETA</span>
+          <span className="header-badge">v2</span>
         </div>
 
-        {/* Center: Workflow actions */}
+        {/* Center actions */}
         <div className="header-actions">
+          {/* Prompt-to-canvas */}
+          <button
+            className="header-btn header-btn-magic"
+            onClick={() => setShowIntentOrchestrator(true)}
+            title="Build workflow from prompt"
+          >
+            <Wand2 size={14} />
+            <span>Build with AI</span>
+          </button>
+
+          <div className="header-divider" />
+
           <button
             className="header-btn"
             onClick={clearCanvas}
@@ -186,7 +192,9 @@ export const Header: React.FC = () => {
             <FolderOpen size={14} />
             <span>Open</span>
           </button>
+
           <div className="header-divider" />
+
           <button className="header-btn" onClick={loadDemo} title="Load Demo">
             <PlayCircle size={14} />
             <span>Demo</span>
@@ -194,18 +202,26 @@ export const Header: React.FC = () => {
           <button
             className="header-btn"
             onClick={applyAutoLayout}
-            title="Auto Layout"
+            title="Auto Layout (Dagre)"
           >
             <LayoutDashboard size={14} />
             <span>Layout</span>
           </button>
           <button
             className="header-btn"
-            onClick={handleExport}
+            onClick={() => setShowVersionHistory(true)}
+            title="Version History"
+          >
+            <GitBranch size={14} />
+            <span>History</span>
+          </button>
+          <button
+            className="header-btn"
+            onClick={handleExportJSON}
             title="Export JSON"
           >
             <Download size={14} />
-            <span>Export</span>
+            <span>JSON</span>
           </button>
           <button
             className="header-btn"
@@ -215,24 +231,41 @@ export const Header: React.FC = () => {
             <Upload size={14} />
             <span>Import</span>
           </button>
+
+          <div className="header-divider" />
+
+          {/* Run simulation */}
+          <button
+            className="header-btn header-btn-run"
+            onClick={() => setShowExecutionPanel(true)}
+            title="Run Simulation"
+          >
+            <Zap size={14} />
+            <span>Run</span>
+          </button>
+
+          {/* Export ZIP */}
+          <button
+            className="header-btn header-btn-export"
+            onClick={() => setShowExportModal(true)}
+            title="Export Project ZIP"
+          >
+            <Download size={14} />
+            <span>Export ZIP</span>
+          </button>
         </div>
 
         {/* Right */}
         <div className="header-right">
-          {/* Node/edge count */}
           <div className="header-stats">
             <span className="header-stat-chip">{nodes.length} nodes</span>
             <span className="header-stat-chip">{edges.length} edges</span>
           </div>
 
-          {/* Credits bar (free plan only) */}
           {plan.tier === "free" && creditsLeft !== null && (
             <button
               className={`header-credits-bar${creditsLeft === 0 ? " depleted" : ""}`}
-              onClick={() => {
-                setPricingTab("credits");
-                setShowPricingModal(true);
-              }}
+              onClick={() => setShowPricingModal(true, "credits")}
               title="Buy more credits"
             >
               <Zap size={11} />
@@ -248,7 +281,6 @@ export const Header: React.FC = () => {
             </button>
           )}
 
-          {/* Plan badge (paid plans) */}
           {plan.tier !== "free" && (
             <div className={`header-plan-pill ${plan.tier}`}>
               <Crown size={11} />
@@ -264,20 +296,15 @@ export const Header: React.FC = () => {
             {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
           </button>
 
-          {/* Upgrade button */}
           <button
             className="header-upgrade-btn"
-            onClick={() => {
-              setPricingTab("plans");
-              setShowPricingModal(true);
-            }}
-            title="Upgrade Plan"
+            onClick={() => setShowPricingModal(true, "plans")}
+            title="Upgrade"
           >
             <Crown size={13} />
             <span>{plan.tier === "free" ? "Upgrade" : "Plans"}</span>
           </button>
 
-          {/* User menu */}
           {user && (
             <div
               className="header-user-menu"
@@ -353,7 +380,6 @@ export const Header: React.FC = () => {
         style={{ display: "none" }}
         onChange={handleImport}
       />
-
       {showWorkflowsModal && (
         <WorkflowsModal onClose={() => setShowWorkflowsModal(false)} />
       )}

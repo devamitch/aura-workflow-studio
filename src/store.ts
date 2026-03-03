@@ -17,174 +17,56 @@ import {
   saveToken,
   type GooglePayload,
 } from "./lib/google-auth";
-import type { HandleConfig, PipelineEdge, PipelineNode } from "./types";
+import type {
+  HandleConfig,
+  PipelineEdge,
+  PipelineNode,
+  UserPlan,
+  PlanTier,
+  ExecutionRun,
+  WorkflowVersion,
+  ExportProjectType,
+} from "./types";
+import { autoLayoutDagre } from "./services/graphCompiler";
+import { validateGraphCredentials } from "./services/graphCompiler";
 
-// ─── Auth Types ────────────────────────────────────────────────────────────────
+// ── Auth User (local interface matching types.ts) ─────────────────────────────
 export interface AuthUser {
-  id: number;
+  id: string | number;
   email: string;
   name?: string | null;
   avatar_url?: string | null;
-  is_admin: boolean;
-  is_premium: boolean;
-  has_api_key: boolean;
+  is_admin?: boolean;
+  is_premium?: boolean;
+  has_api_key?: boolean;
 }
 
-// ─── Demo Data ─────────────────────────────────────────────────────────────────
+// ── Demo Data ─────────────────────────────────────────────────────────────────
 const demoNodes: PipelineNode[] = [
-  {
-    id: "d-input1",
-    type: "customInput",
-    position: { x: 60, y: 80 },
-    data: {
-      id: "d-input1",
-      nodeType: "customInput",
-      inputName: "user_query",
-      inputType: "Text",
-    },
-  },
-  {
-    id: "d-input2",
-    type: "customInput",
-    position: { x: 60, y: 330 },
-    data: {
-      id: "d-input2",
-      nodeType: "customInput",
-      inputName: "topic",
-      inputType: "Text",
-    },
-  },
-  {
-    id: "d-text",
-    type: "text",
-    position: { x: 60, y: 560 },
-    data: {
-      id: "d-text",
-      nodeType: "text",
-      text: "You are an expert research analyst. Synthesize the provided information into a comprehensive, well-structured report.",
-    },
-  },
-  {
-    id: "d-api",
-    type: "api",
-    position: { x: 420, y: 440 },
-    data: {
-      id: "d-api",
-      nodeType: "api",
-      method: "GET",
-      url: "https://api.research.io/search",
-    },
-  },
-  {
-    id: "d-filter",
-    type: "filter",
-    position: { x: 420, y: 640 },
-    data: {
-      id: "d-filter",
-      nodeType: "filter",
-      condition: "value.relevance_score > 0.7",
-    },
-  },
-  {
-    id: "d-llm",
-    type: "llm",
-    position: { x: 420, y: 100 },
-    data: { id: "d-llm", nodeType: "llm" },
-  },
-  {
-    id: "d-merge",
-    type: "merge",
-    position: { x: 760, y: 300 },
-    data: { id: "d-merge", nodeType: "merge" },
-  },
-  {
-    id: "d-output",
-    type: "customOutput",
-    position: { x: 1060, y: 300 },
-    data: {
-      id: "d-output",
-      nodeType: "customOutput",
-      outputName: "research_report",
-      outputType: "Text",
-    },
-  },
+  { id: "d-input1", type: "customInput", position: { x: 60, y: 80 }, data: { id: "d-input1", nodeType: "customInput", label: "User Query", inputName: "user_query", inputType: "Text" } },
+  { id: "d-input2", type: "customInput", position: { x: 60, y: 330 }, data: { id: "d-input2", nodeType: "customInput", label: "Research Topic", inputName: "topic", inputType: "Text" } },
+  { id: "d-text", type: "text", position: { x: 60, y: 560 }, data: { id: "d-text", nodeType: "text", label: "System Prompt", text: "You are an expert research analyst. Synthesize information into a comprehensive report." } },
+  { id: "d-api", type: "api", position: { x: 420, y: 440 }, data: { id: "d-api", nodeType: "api", label: "Fetch Research", method: "GET", url: "https://api.research.io/search" } },
+  { id: "d-filter", type: "filter", position: { x: 420, y: 640 }, data: { id: "d-filter", nodeType: "filter", label: "Filter Results", condition: "value.relevance_score > 0.7" } },
+  { id: "d-llm", type: "llm", position: { x: 420, y: 100 }, data: { id: "d-llm", nodeType: "llm", label: "Analyze with LLM" } },
+  { id: "d-merge", type: "merge", position: { x: 760, y: 300 }, data: { id: "d-merge", nodeType: "merge", label: "Merge Outputs" } },
+  { id: "d-output", type: "customOutput", position: { x: 1060, y: 300 }, data: { id: "d-output", nodeType: "customOutput", label: "Research Report", outputName: "research_report" } },
 ];
 
 const demoEdges: PipelineEdge[] = [
-  {
-    id: "de-1",
-    source: "d-input1",
-    sourceHandle: "d-input1-value",
-    target: "d-llm",
-    targetHandle: "d-llm-prompt",
-    type: "smoothstep",
-    animated: true,
-    markerEnd: { type: MarkerType.Arrow, height: 20, width: 20 },
-  },
-  {
-    id: "de-2",
-    source: "d-text",
-    sourceHandle: "d-text-value",
-    target: "d-llm",
-    targetHandle: "d-llm-system",
-    type: "smoothstep",
-    animated: true,
-    markerEnd: { type: MarkerType.Arrow, height: 20, width: 20 },
-  },
-  {
-    id: "de-3",
-    source: "d-input2",
-    sourceHandle: "d-input2-value",
-    target: "d-api",
-    targetHandle: "d-api-body",
-    type: "smoothstep",
-    animated: true,
-    markerEnd: { type: MarkerType.Arrow, height: 20, width: 20 },
-  },
-  {
-    id: "de-4",
-    source: "d-api",
-    sourceHandle: "d-api-response",
-    target: "d-filter",
-    targetHandle: "d-filter-input",
-    type: "smoothstep",
-    animated: true,
-    markerEnd: { type: MarkerType.Arrow, height: 20, width: 20 },
-  },
-  {
-    id: "de-5",
-    source: "d-llm",
-    sourceHandle: "d-llm-response",
-    target: "d-merge",
-    targetHandle: "d-merge-input-a",
-    type: "smoothstep",
-    animated: true,
-    markerEnd: { type: MarkerType.Arrow, height: 20, width: 20 },
-  },
-  {
-    id: "de-6",
-    source: "d-filter",
-    sourceHandle: "d-filter-pass",
-    target: "d-merge",
-    targetHandle: "d-merge-input-b",
-    type: "smoothstep",
-    animated: true,
-    markerEnd: { type: MarkerType.Arrow, height: 20, width: 20 },
-  },
-  {
-    id: "de-7",
-    source: "d-merge",
-    sourceHandle: "d-merge-merged",
-    target: "d-output",
-    targetHandle: "d-output-value",
-    type: "smoothstep",
-    animated: true,
-    markerEnd: { type: MarkerType.Arrow, height: 20, width: 20 },
-  },
+  { id: "de-1", source: "d-input1", sourceHandle: "d-input1-value", target: "d-llm", targetHandle: "d-llm-prompt", type: "smoothstep", animated: true, markerEnd: { type: MarkerType.Arrow, height: 20, width: 20 }, data: { edgeColor: "#6366f1" } },
+  { id: "de-2", source: "d-text", sourceHandle: "d-text-value", target: "d-llm", targetHandle: "d-llm-system", type: "smoothstep", animated: true, markerEnd: { type: MarkerType.Arrow, height: 20, width: 20 }, data: { edgeColor: "#6366f1" } },
+  { id: "de-3", source: "d-input2", sourceHandle: "d-input2-value", target: "d-api", targetHandle: "d-api-body", type: "smoothstep", animated: true, markerEnd: { type: MarkerType.Arrow, height: 20, width: 20 }, data: { edgeColor: "#f59e0b" } },
+  { id: "de-4", source: "d-api", sourceHandle: "d-api-response", target: "d-filter", targetHandle: "d-filter-input", type: "smoothstep", animated: true, markerEnd: { type: MarkerType.Arrow, height: 20, width: 20 }, data: { edgeColor: "#f59e0b" } },
+  { id: "de-5", source: "d-llm", sourceHandle: "d-llm-response", target: "d-merge", targetHandle: "d-merge-input-a", type: "smoothstep", animated: true, markerEnd: { type: MarkerType.Arrow, height: 20, width: 20 }, data: { edgeColor: "#10b981" } },
+  { id: "de-6", source: "d-filter", sourceHandle: "d-filter-pass", target: "d-merge", targetHandle: "d-merge-input-b", type: "smoothstep", animated: true, markerEnd: { type: MarkerType.Arrow, height: 20, width: 20 }, data: { edgeColor: "#3b82f6" } },
+  { id: "de-7", source: "d-merge", sourceHandle: "d-merge-merged", target: "d-output", targetHandle: "d-output-value", type: "smoothstep", animated: true, markerEnd: { type: MarkerType.Arrow, height: 20, width: 20 }, data: { edgeColor: "#6366f1" } },
 ];
 
-// ─── Workflow Persistence ──────────────────────────────────────────────────────
+// ── Persistence helpers ────────────────────────────────────────────────────────
 const LS_KEY = "vs_saved_workflows";
+const PLAN_LS_KEY = "aura_user_plan";
+const VERSIONS_KEY = "aura_workflow_versions";
 
 export interface SavedWorkflow {
   id: string;
@@ -197,101 +79,52 @@ export interface SavedWorkflow {
 }
 
 function readSavedWorkflows(): SavedWorkflow[] {
-  try {
-    return JSON.parse(localStorage.getItem(LS_KEY) || "[]");
-  } catch {
-    return [];
-  }
+  try { return JSON.parse(localStorage.getItem(LS_KEY) ?? "[]"); } catch { return []; }
 }
-function writeSavedWorkflows(list: SavedWorkflow[]): void {
-  try {
-    localStorage.setItem(LS_KEY, JSON.stringify(list));
-  } catch {}
+function writeSavedWorkflows(list: SavedWorkflow[]) {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(list)); } catch {}
 }
 
-// ─── Plan & Credits ─────────────────────────────────────────────────────────────
-export type PlanTier = "free" | "pro" | "annual";
-
-export interface UserPlan {
-  tier: PlanTier;
-  creditsUsed: number;
-  creditsTotal: number;
-  creditsExtra: number; // purchased add-on credits
-  renewsAt: string | null;
+function readVersions(): WorkflowVersion[] {
+  try { return JSON.parse(localStorage.getItem(VERSIONS_KEY) ?? "[]"); } catch { return []; }
+}
+function writeVersions(v: WorkflowVersion[]) {
+  try { localStorage.setItem(VERSIONS_KEY, JSON.stringify(v)); } catch {}
 }
 
-export const PLAN_LIMITS: Record<
-  PlanTier,
-  { aiGenerations: number; modelAccess: string[] }
-> = {
+// ── Plan ──────────────────────────────────────────────────────────────────────
+export const PLAN_LIMITS: Record<PlanTier, { aiGenerations: number; modelAccess: string[] }> = {
   free: { aiGenerations: 20, modelAccess: ["gemini-1.5-flash"] },
-  pro: {
-    aiGenerations: Infinity,
-    modelAccess: [
-      "gemini-1.5-flash",
-      "gemini-1.5-pro",
-      "gpt-4o",
-      "gpt-4-turbo",
-      "claude-3-5-sonnet",
-      "claude-3-haiku",
-    ],
-  },
-  annual: {
-    aiGenerations: Infinity,
-    modelAccess: [
-      "gemini-1.5-flash",
-      "gemini-1.5-pro",
-      "gpt-4o",
-      "gpt-4-turbo",
-      "claude-3-5-sonnet",
-      "claude-3-haiku",
-      "claude-3-opus",
-    ],
-  },
+  pro: { aiGenerations: Infinity, modelAccess: ["gemini-1.5-flash", "gemini-2.5-flash", "gpt-4o", "gpt-4o-mini", "claude-sonnet-4-6", "claude-haiku-4-5-20251001"] },
+  annual: { aiGenerations: Infinity, modelAccess: ["gemini-1.5-flash", "gemini-2.5-flash", "gpt-4o", "gpt-4o-mini", "claude-sonnet-4-6", "claude-opus-4-6", "claude-haiku-4-5-20251001"] },
 };
 
-const PLAN_LS_KEY = "aura_user_plan";
 function loadPlan(): UserPlan {
   try {
     const raw = localStorage.getItem(PLAN_LS_KEY);
     if (raw) return JSON.parse(raw) as UserPlan;
   } catch {}
-  return {
-    tier: "free",
-    creditsUsed: 0,
-    creditsTotal: 20,
-    creditsExtra: 0,
-    renewsAt: null,
-  };
+  return { tier: "free", creditsUsed: 0, creditsTotal: 20, creditsExtra: 0 };
 }
 function savePlan(plan: UserPlan) {
-  try {
-    localStorage.setItem(PLAN_LS_KEY, JSON.stringify(plan));
-  } catch {}
+  try { localStorage.setItem(PLAN_LS_KEY, JSON.stringify(plan)); } catch {}
 }
 
-interface NodeIDs {
-  [type: string]: number;
-}
-
-// ─── Store Interface ───────────────────────────────────────────────────────────
+// ── Store interface ────────────────────────────────────────────────────────────
 interface CombinedStore {
   // Auth
   user: AuthUser | null;
   token: string | null;
   loading: boolean;
   bootstrapAuth: () => void;
-  signInWithGoogle: (
-    credential: string,
-    userInfo?: { sub: string; email: string; name?: string; picture?: string },
-  ) => Promise<void>;
+  signInWithGoogle: (credential: string, userInfo?: { sub: string; email: string; name?: string; picture?: string }) => Promise<void>;
   refreshUser: () => Promise<void>;
   signOut: () => Promise<void>;
 
   // Plan & Credits
   plan: UserPlan;
   setPlan: (tier: PlanTier, extraCredits?: number) => void;
-  consumeCredit: () => boolean; // returns false if out of credits
+  consumeCredit: () => boolean;
   addExtraCredits: (amount: number) => void;
 
   // Theme
@@ -301,7 +134,7 @@ interface CombinedStore {
   // Canvas
   nodes: PipelineNode[];
   edges: PipelineEdge[];
-  nodeIDs: NodeIDs;
+  nodeIDs: Record<string, number>;
 
   // History
   pastNodes: PipelineNode[][];
@@ -318,23 +151,19 @@ interface CombinedStore {
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
   onConnect: (connection: Connection) => void;
-  updateNodeField: (
-    nodeId: string,
-    fieldName: string,
-    fieldValue: unknown,
-  ) => void;
+  onEdgeUpdate: (oldEdge: PipelineEdge, newConnection: Connection) => void;
+  updateNodeField: (nodeId: string, fieldName: string, fieldValue: unknown) => void;
+  updateNodeCredential: (nodeId: string, credKey: string, encryptedValue: string) => void;
   deleteNode: (nodeId: string) => void;
   addNodeHandle: (nodeId: string, handle: HandleConfig) => void;
   removeNodeHandle: (nodeId: string, handleId: string) => void;
   deleteEdge: (edgeId: string) => void;
   updateEdgeLabel: (edgeId: string, label: string) => void;
-  updateEdgeStyle: (
-    edgeId: string,
-    style: { color?: string; variant?: "solid" | "dashed" },
-  ) => void;
+  updateEdgeStyle: (edgeId: string, style: { color?: string; variant?: "solid" | "dashed" }) => void;
   clearCanvas: () => void;
   loadDemo: () => void;
   applyGeneratedGraph: (nodes: PipelineNode[], edges: PipelineEdge[]) => void;
+  applyAutoLayout: () => void;
 
   // Workflow persistence
   saveWorkflow: (name: string) => void;
@@ -343,140 +172,84 @@ interface CombinedStore {
   deleteSavedWorkflow: (id: string) => void;
   exportToJSON: () => string;
   importFromJSON: (json: string) => { ok: boolean; error?: string };
-  applyAutoLayout: () => void;
+
+  // Versions
+  versions: WorkflowVersion[];
+  createVersion: (label?: string) => void;
+  restoreVersion: (id: string) => void;
+  deleteVersion: (id: string) => void;
+
+  // Validation
+  validationErrors: Record<string, string[]>;
+  runValidation: () => void;
+
+  // Execution state
+  currentRun: ExecutionRun | null;
+  executionHistory: ExecutionRun[];
+  setCurrentRun: (run: ExecutionRun | null) => void;
+  updateRunResult: (nodeId: string, state: "running" | "success" | "failed" | "skipped") => void;
+  addExecutionRun: (run: ExecutionRun) => void;
+  clearExecution: () => void;
+
+  // UI State
+  selectedNodeId: string | null;
+  rightPanelMode: "chat" | "node-config";
+  showIntentOrchestrator: boolean;
+  showExecutionPanel: boolean;
+  showExportModal: boolean;
+  showVersionHistory: boolean;
+  showPricingModal: boolean;
+  pricingTab: "plans" | "credits";
+  setSelectedNode: (nodeId: string | null) => void;
+  setRightPanelMode: (mode: "chat" | "node-config") => void;
+  setShowIntentOrchestrator: (v: boolean) => void;
+  setShowExecutionPanel: (v: boolean) => void;
+  setShowExportModal: (v: boolean) => void;
+  setShowVersionHistory: (v: boolean) => void;
+  setShowPricingModal: (v: boolean, tab?: "plans" | "credits") => void;
 }
 
-function makeEdge(
-  overrides: Partial<PipelineEdge> & {
-    id: string;
-    source: string;
-    target: string;
-  },
+// ── Edge factory ──────────────────────────────────────────────────────────────
+export function makeEdge(
+  overrides: Partial<PipelineEdge> & { id: string; source: string; target: string }
 ): PipelineEdge {
   return {
     type: "smoothstep",
-    animated: true,
+    animated: false,
     markerEnd: { type: MarkerType.Arrow, height: 20, width: 20 },
+    data: { edgeColor: "#6366f1" },
     ...overrides,
   };
 }
 
-const API_URL = () =>
-  (import.meta.env.VITE_API_URL as string) || "http://localhost:8000";
+const API_URL = () => (import.meta.env.VITE_API_URL as string) || "http://localhost:8000";
 
-// ─── Store Implementation ──────────────────────────────────────────────────────
+// ── Store ─────────────────────────────────────────────────────────────────────
 export const useStore = create<CombinedStore>((set, get) => ({
   // ── Auth ──────────────────────────────────────────────────────────────────
   user: null,
   token: null,
   loading: isGoogleConfigured,
 
-  // ── Plan & Credits ────────────────────────────────────────────────────────
-  plan: loadPlan(),
-
-  setPlan: (tier, extraCredits = 0) => {
-    const total = tier === "free" ? 20 : Infinity;
-    const plan: UserPlan = {
-      tier,
-      creditsUsed: 0,
-      creditsTotal: total,
-      creditsExtra: extraCredits,
-      renewsAt:
-        tier !== "free"
-          ? new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString()
-          : null,
-    };
-    savePlan(plan);
-    set({ plan });
-  },
-
-  consumeCredit: () => {
-    const { plan } = get();
-    if (plan.tier !== "free") return true; // paid plans: unlimited
-    const available = plan.creditsTotal + plan.creditsExtra - plan.creditsUsed;
-    if (available <= 0) return false;
-    const updated = { ...plan, creditsUsed: plan.creditsUsed + 1 };
-    savePlan(updated);
-    set({ plan: updated });
-    return true;
-  },
-
-  addExtraCredits: (amount: number) => {
-    const { plan } = get();
-    const updated = { ...plan, creditsExtra: plan.creditsExtra + amount };
-    savePlan(updated);
-    set({ plan: updated });
-  },
-
   bootstrapAuth: () => {
-    if (!isGoogleConfigured) {
-      set({ loading: false });
-      return;
-    }
+    if (!isGoogleConfigured) { set({ loading: false }); return; }
     const stored = loadToken();
-    if (!stored) {
-      set({ loading: false });
-      return;
-    }
+    if (!stored) { set({ loading: false }); return; }
     try {
       const payload = decodeJwtPayload<GooglePayload>(stored);
-      set({
-        user: {
-          id: 0,
-          email: payload.email,
-          name: payload.name ?? null,
-          avatar_url: payload.picture ?? null,
-          is_admin: false,
-          is_premium: false,
-          has_api_key: false,
-        },
-        token: stored,
-        loading: false,
-      });
+      set({ user: { id: 0, email: payload.email, name: payload.name ?? null, avatar_url: payload.picture ?? null, is_admin: false, is_premium: false, has_api_key: false }, token: stored, loading: false });
       void get().refreshUser();
-    } catch {
-      clearToken();
-      set({ loading: false });
-    }
+    } catch { clearToken(); set({ loading: false }); }
   },
 
-  signInWithGoogle: async (
-    credential: string,
-    userInfo?: { sub: string; email: string; name?: string; picture?: string },
-  ) => {
+  signInWithGoogle: async (credential, userInfo) => {
     saveToken(credential);
-    // If pre-decoded userInfo is supplied (access-token flow), use it directly;
-    // otherwise try to decode the credential as a JWT (one-tap/credential flow).
-    let email = "";
-    let name: string | null = null;
-    let picture: string | null = null;
-    if (userInfo) {
-      email = userInfo.email;
-      name = userInfo.name ?? null;
-      picture = userInfo.picture ?? null;
-    } else {
-      try {
-        const payload = decodeJwtPayload<GooglePayload>(credential);
-        email = payload.email;
-        name = payload.name ?? null;
-        picture = payload.picture ?? null;
-      } catch {
-        // credential is not a JWT; user info unavailable without separate fetch
-      }
+    let email = "", name: string | null = null, picture: string | null = null;
+    if (userInfo) { email = userInfo.email; name = userInfo.name ?? null; picture = userInfo.picture ?? null; }
+    else {
+      try { const p = decodeJwtPayload<GooglePayload>(credential); email = p.email; name = p.name ?? null; picture = p.picture ?? null; } catch {}
     }
-    set({
-      user: {
-        id: 0,
-        email,
-        name,
-        avatar_url: picture,
-        is_admin: false,
-        is_premium: false,
-        has_api_key: false,
-      },
-      token: credential,
-      loading: false,
-    });
+    set({ user: { id: 0, email, name, avatar_url: picture, is_admin: false, is_premium: false, has_api_key: false }, token: credential, loading: false });
     await get().refreshUser();
   },
 
@@ -484,373 +257,296 @@ export const useStore = create<CombinedStore>((set, get) => ({
     const { token } = get();
     if (!token) return;
     try {
-      const r = await fetch(`${API_URL()}/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!r.ok) {
-        const { user } = get();
-        if (user) set({ user: { ...user, has_api_key: true } });
-        return;
-      }
-      const data = (await r.json()) as {
-        id?: number;
-        email?: string;
-        name?: string | null;
-        avatar_url?: string | null;
-        is_admin?: boolean;
-        is_premium?: boolean;
-        has_api_key?: boolean;
-      };
-      set({
-        user: {
-          id: data.id ?? 0,
-          email: data.email ?? "",
-          name: data.name ?? null,
-          avatar_url: data.avatar_url ?? null,
-          is_admin: data.is_admin ?? false,
-          is_premium: data.is_premium ?? false,
-          has_api_key: data.has_api_key ?? false,
-        },
-      });
-    } catch {
-      const { user } = get();
-      if (user) set({ user: { ...user, has_api_key: true } });
-    }
+      const r = await fetch(`${API_URL()}/auth/me`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!r.ok) { const { user } = get(); if (user) set({ user: { ...user, has_api_key: true } }); return; }
+      const data = await r.json() as Record<string, unknown>;
+      set({ user: { id: (data.id as number) ?? 0, email: (data.email as string) ?? "", name: (data.name as string | null) ?? null, avatar_url: (data.avatar_url as string | null) ?? null, is_admin: (data.is_admin as boolean) ?? false, is_premium: (data.is_premium as boolean) ?? false, has_api_key: (data.has_api_key as boolean) ?? false } });
+    } catch { const { user } = get(); if (user) set({ user: { ...user, has_api_key: true } }); }
   },
 
-  signOut: async () => {
-    clearToken();
-    googleLogout();
-    set({ user: null, token: null });
+  signOut: async () => { clearToken(); googleLogout(); set({ user: null, token: null }); },
+
+  // ── Plan & Credits ────────────────────────────────────────────────────────
+  plan: loadPlan(),
+
+  setPlan: (tier, extraCredits = 0) => {
+    const plan: UserPlan = { tier, creditsUsed: 0, creditsTotal: tier === "free" ? 20 : Infinity, creditsExtra: extraCredits, renewsAt: tier !== "free" ? new Date(Date.now() + 30 * 24 * 3600_000).toISOString() : undefined };
+    savePlan(plan); set({ plan });
+  },
+
+  consumeCredit: () => {
+    const { plan } = get();
+    if (plan.tier !== "free") return true;
+    const available = plan.creditsTotal + plan.creditsExtra - plan.creditsUsed;
+    if (available <= 0) return false;
+    const updated = { ...plan, creditsUsed: plan.creditsUsed + 1 };
+    savePlan(updated); set({ plan: updated }); return true;
+  },
+
+  addExtraCredits: (amount) => {
+    const { plan } = get();
+    const updated = { ...plan, creditsExtra: plan.creditsExtra + amount };
+    savePlan(updated); set({ plan: updated });
   },
 
   // ── Theme ─────────────────────────────────────────────────────────────────
   theme: "dark",
   toggleTheme: () => {
     const next = get().theme === "dark" ? "light" : "dark";
-    set({ theme: next });
-    document.body.setAttribute("data-theme", next);
+    set({ theme: next }); document.body.setAttribute("data-theme", next);
   },
 
   // ── Canvas ────────────────────────────────────────────────────────────────
   nodes: demoNodes,
   edges: demoEdges,
   nodeIDs: { customInput: 1, text: 1, llm: 1, customOutput: 1 },
-
-  pastNodes: [],
-  pastEdges: [],
-  futureNodes: [],
-  futureEdges: [],
+  pastNodes: [], pastEdges: [], futureNodes: [], futureEdges: [],
 
   takeSnapshot: () => {
     const { nodes, edges, pastNodes, pastEdges } = get();
-    set({
-      pastNodes: [...pastNodes.slice(-49), [...nodes]],
-      pastEdges: [...pastEdges.slice(-49), [...edges]],
-      futureNodes: [],
-      futureEdges: [],
-    });
+    set({ pastNodes: [...pastNodes.slice(-49), [...nodes]], pastEdges: [...pastEdges.slice(-49), [...edges]], futureNodes: [], futureEdges: [] });
   },
 
   undo: () => {
-    const { nodes, edges, pastNodes, pastEdges, futureNodes, futureEdges } =
-      get();
-    if (pastNodes.length === 0) return;
-    set({
-      nodes: pastNodes[pastNodes.length - 1],
-      edges: pastEdges[pastEdges.length - 1],
-      pastNodes: pastNodes.slice(0, -1),
-      pastEdges: pastEdges.slice(0, -1),
-      futureNodes: [[...nodes], ...futureNodes.slice(0, 49)],
-      futureEdges: [[...edges], ...futureEdges.slice(0, 49)],
-    });
+    const { nodes, edges, pastNodes, pastEdges, futureNodes, futureEdges } = get();
+    if (!pastNodes.length) return;
+    set({ nodes: pastNodes[pastNodes.length - 1], edges: pastEdges[pastEdges.length - 1], pastNodes: pastNodes.slice(0, -1), pastEdges: pastEdges.slice(0, -1), futureNodes: [[...nodes], ...futureNodes.slice(0, 49)], futureEdges: [[...edges], ...futureEdges.slice(0, 49)] });
   },
 
   redo: () => {
-    const { nodes, edges, pastNodes, pastEdges, futureNodes, futureEdges } =
-      get();
-    if (futureNodes.length === 0) return;
-    set({
-      nodes: futureNodes[0],
-      edges: futureEdges[0],
-      pastNodes: [...pastNodes.slice(-49), [...nodes]],
-      pastEdges: [...pastEdges.slice(-49), [...edges]],
-      futureNodes: futureNodes.slice(1),
-      futureEdges: futureEdges.slice(1),
-    });
+    const { nodes, edges, pastNodes, pastEdges, futureNodes, futureEdges } = get();
+    if (!futureNodes.length) return;
+    set({ nodes: futureNodes[0], edges: futureEdges[0], pastNodes: [...pastNodes.slice(-49), [...nodes]], pastEdges: [...pastEdges.slice(-49), [...edges]], futureNodes: futureNodes.slice(1), futureEdges: futureEdges.slice(1) });
   },
 
-  getNodeID: (type: string): string => {
+  getNodeID: (type) => {
     const ids = { ...get().nodeIDs };
-    if (ids[type] === undefined) ids[type] = 0;
-    ids[type] += 1;
+    ids[type] = (ids[type] ?? 0) + 1;
     set({ nodeIDs: ids });
     return `${type}-${ids[type]}`;
   },
 
-  addNode: (node: PipelineNode) => {
+  addNode: (node) => {
     get().takeSnapshot();
     set({ nodes: [...get().nodes, node] });
+    // Auto-validate credentials after node is placed
+    setTimeout(() => get().runValidation(), 0);
   },
 
-  onNodesChange: (changes: NodeChange[]) => {
-    set({ nodes: applyNodeChanges(changes, get().nodes) });
-  },
+  onNodesChange: (changes) => { set({ nodes: applyNodeChanges(changes, get().nodes) as PipelineNode[] }); },
 
-  onEdgesChange: (changes: EdgeChange[]) => {
-    set({ edges: applyEdgeChanges(changes, get().edges) });
-  },
+  onEdgesChange: (changes) => { set({ edges: applyEdgeChanges(changes, get().edges) as PipelineEdge[] }); },
 
-  onConnect: (connection: Connection) => {
+  onConnect: (connection) => {
     get().takeSnapshot();
-    set({
-      edges: addEdge(
-        makeEdge({
-          ...connection,
-          id: `e-${Date.now()}`,
-          source: connection.source ?? "",
-          target: connection.target ?? "",
-        }),
-        get().edges,
-      ),
+    set({ edges: addEdge(makeEdge({ ...connection, id: `e-${Date.now()}`, source: connection.source ?? "", target: connection.target ?? "" }), get().edges) as PipelineEdge[] });
+  },
+
+  // Edge reconnection — drag an edge endpoint to a different node
+  onEdgeUpdate: (oldEdge, newConnection) => {
+    get().takeSnapshot();
+    // Manually replace the old edge with a reconnected version (equivalent to deprecated updateEdge)
+    const filtered = get().edges.filter((e) => e.id !== oldEdge.id);
+    const reconnected = makeEdge({
+      ...oldEdge,
+      ...newConnection,
+      id: oldEdge.id,
+      source: newConnection.source ?? oldEdge.source,
+      target: newConnection.target ?? oldEdge.target,
+      sourceHandle: newConnection.sourceHandle ?? oldEdge.sourceHandle,
+      targetHandle: newConnection.targetHandle ?? oldEdge.targetHandle,
     });
+    set({ edges: [...filtered, reconnected] });
   },
 
   updateNodeField: (nodeId, fieldName, fieldValue) => {
     get().takeSnapshot();
+    set({ nodes: get().nodes.map((n) => n.id === nodeId ? { ...n, data: { ...n.data, [fieldName]: fieldValue } } : n) });
+  },
+
+  updateNodeCredential: (nodeId, credKey, encryptedValue) => {
     set({
       nodes: get().nodes.map((n) =>
         n.id === nodeId
-          ? { ...n, data: { ...n.data, [fieldName]: fieldValue } }
-          : n,
+          ? { ...n, data: { ...n.data, credentials: { ...(n.data.credentials ?? {}), [credKey]: encryptedValue } } }
+          : n
       ),
     });
   },
 
-  deleteNode: (nodeId: string) => {
+  deleteNode: (nodeId) => {
     get().takeSnapshot();
+    set({ nodes: get().nodes.filter((n) => n.id !== nodeId), edges: get().edges.filter((e) => e.source !== nodeId && e.target !== nodeId) });
+  },
+
+  addNodeHandle: (nodeId, handle) => {
+    get().takeSnapshot();
+    set({ nodes: get().nodes.map((n) => n.id === nodeId ? { ...n, data: { ...n.data, customHandles: [...((n.data.customHandles as HandleConfig[] | undefined) ?? []), handle] } } : n) });
+  },
+
+  removeNodeHandle: (nodeId, handleId) => {
+    get().takeSnapshot();
+    const fullId = `${nodeId}-${handleId}`;
     set({
-      nodes: get().nodes.filter((n) => n.id !== nodeId),
-      edges: get().edges.filter(
-        (e) => e.source !== nodeId && e.target !== nodeId,
-      ),
+      nodes: get().nodes.map((n) => n.id === nodeId ? { ...n, data: { ...n.data, customHandles: ((n.data.customHandles as HandleConfig[] | undefined) ?? []).filter((h) => h.id !== handleId) } } : n),
+      edges: get().edges.filter((e) => e.sourceHandle !== fullId && e.targetHandle !== fullId),
     });
   },
 
-  addNodeHandle: (nodeId: string, handle: HandleConfig) => {
-    get().takeSnapshot();
-    set({
-      nodes: get().nodes.map((n) =>
-        n.id === nodeId
-          ? {
-              ...n,
-              data: {
-                ...n.data,
-                customHandles: [
-                  ...((n.data.customHandles as HandleConfig[] | undefined) ??
-                    []),
-                  handle,
-                ],
-              },
-            }
-          : n,
-      ),
-    });
-  },
+  deleteEdge: (edgeId) => { get().takeSnapshot(); set({ edges: get().edges.filter((e) => e.id !== edgeId) }); },
 
-  removeNodeHandle: (nodeId: string, handleId: string) => {
+  updateEdgeLabel: (edgeId, label) => {
     get().takeSnapshot();
-    const fullHandleId = `${nodeId}-${handleId}`;
-    set({
-      nodes: get().nodes.map((n) =>
-        n.id === nodeId
-          ? {
-              ...n,
-              data: {
-                ...n.data,
-                customHandles: (
-                  (n.data.customHandles as HandleConfig[] | undefined) ?? []
-                ).filter((h) => h.id !== handleId),
-              },
-            }
-          : n,
-      ),
-      edges: get().edges.filter(
-        (e) =>
-          e.sourceHandle !== fullHandleId && e.targetHandle !== fullHandleId,
-      ),
-    });
-  },
-
-  deleteEdge: (edgeId: string) => {
-    get().takeSnapshot();
-    set({ edges: get().edges.filter((e) => e.id !== edgeId) });
-  },
-
-  updateEdgeLabel: (edgeId: string, label: string) => {
-    get().takeSnapshot();
-    set({
-      edges: get().edges.map((e) =>
-        e.id === edgeId ? { ...e, label: label || undefined } : e,
-      ),
-    });
+    set({ edges: get().edges.map((e) => e.id === edgeId ? { ...e, label: label || undefined } : e) });
   },
 
   updateEdgeStyle: (edgeId, style) => {
     get().takeSnapshot();
-    set({
-      edges: get().edges.map((e) =>
-        e.id === edgeId
-          ? {
-              ...e,
-              data: {
-                ...(e.data as Record<string, unknown>),
-                edgeColor:
-                  style.color ?? (e.data as Record<string, unknown>)?.edgeColor,
-                edgeVariant:
-                  style.variant ??
-                  (e.data as Record<string, unknown>)?.edgeVariant,
-              },
-            }
-          : e,
-      ),
-    });
+    set({ edges: get().edges.map((e) => e.id === edgeId ? { ...e, data: { ...(e.data ?? {}), edgeColor: style.color ?? e.data?.edgeColor, edgeVariant: style.variant ?? (e.data as Record<string,unknown>)?.edgeVariant } } : e) });
   },
 
-  clearCanvas: () => {
-    get().takeSnapshot();
-    set({ nodes: [], edges: [] });
-  },
-
-  loadDemo: () => {
-    get().takeSnapshot();
-    set({ nodes: demoNodes, edges: demoEdges });
-  },
+  clearCanvas: () => { get().takeSnapshot(); set({ nodes: [], edges: [], selectedNodeId: null }); },
+  loadDemo: () => { get().takeSnapshot(); set({ nodes: demoNodes, edges: demoEdges }); },
 
   applyGeneratedGraph: (nodes, edges) => {
     get().takeSnapshot();
     set({ nodes, edges });
+    setTimeout(() => get().runValidation(), 100);
+  },
+
+  applyAutoLayout: () => {
+    const { nodes, edges } = get();
+    if (!nodes.length) return;
+    get().takeSnapshot();
+    set({ nodes: autoLayoutDagre(nodes, edges, { rankdir: "LR" }) });
   },
 
   // ── Workflow Persistence ──────────────────────────────────────────────────
-  saveWorkflow: (name: string) => {
+  saveWorkflow: (name) => {
     const { nodes, edges, token } = get();
     const wfName = name.trim() || "Untitled";
     const list = readSavedWorkflows();
-    list.unshift({
-      id: `wf-${Date.now()}`,
-      name: wfName,
-      savedAt: new Date().toISOString(),
-      nodeCount: nodes.length,
-      edgeCount: edges.length,
-      nodes: JSON.parse(JSON.stringify(nodes)),
-      edges: JSON.parse(JSON.stringify(edges)),
-    });
+    list.unshift({ id: `wf-${Date.now()}`, name: wfName, savedAt: new Date().toISOString(), nodeCount: nodes.length, edgeCount: edges.length, nodes: JSON.parse(JSON.stringify(nodes)), edges: JSON.parse(JSON.stringify(edges)) });
     writeSavedWorkflows(list.slice(0, 50));
-
     if (!token) return;
-    void fetch(`${API_URL()}/pipelines`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        name: wfName,
-        description: null,
-        graph: { nodes, edges },
-      }),
-    }).catch(() => {});
+    void fetch(`${API_URL()}/pipelines`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: wfName, description: null, graph: { nodes, edges } }) }).catch(() => {});
   },
 
   getSavedWorkflows: () => readSavedWorkflows(),
 
-  loadSavedWorkflow: (id: string) => {
+  loadSavedWorkflow: (id) => {
     const wf = readSavedWorkflows().find((w) => w.id === id);
     if (!wf) return;
     get().takeSnapshot();
     set({ nodes: wf.nodes, edges: wf.edges });
   },
 
-  deleteSavedWorkflow: (id: string) => {
-    writeSavedWorkflows(readSavedWorkflows().filter((w) => w.id !== id));
-  },
+  deleteSavedWorkflow: (id) => { writeSavedWorkflows(readSavedWorkflows().filter((w) => w.id !== id)); },
 
-  exportToJSON: (): string =>
-    JSON.stringify({ nodes: get().nodes, edges: get().edges }, null, 2),
+  exportToJSON: () => JSON.stringify({ nodes: get().nodes, edges: get().edges }, null, 2),
 
-  importFromJSON: (json: string): { ok: boolean; error?: string } => {
+  importFromJSON: (json) => {
     try {
       const parsed = JSON.parse(json);
-      if (!Array.isArray(parsed.nodes) || !Array.isArray(parsed.edges))
-        return { ok: false, error: "Expected { nodes, edges }" };
+      if (!Array.isArray(parsed.nodes) || !Array.isArray(parsed.edges)) return { ok: false, error: "Expected { nodes, edges }" };
       get().takeSnapshot();
       set({ nodes: parsed.nodes, edges: parsed.edges });
       return { ok: true };
     } catch (e) {
-      return {
-        ok: false,
-        error: e instanceof Error ? e.message : "Parse error",
-      };
+      return { ok: false, error: e instanceof Error ? e.message : "Parse error" };
     }
   },
 
-  applyAutoLayout: () => {
+  // ── Versions ─────────────────────────────────────────────────────────────
+  versions: readVersions(),
+
+  createVersion: (label) => {
     const { nodes, edges } = get();
-    if (nodes.length === 0) return;
-
-    const COL_W = 310,
-      ROW_H = 200,
-      PAD_X = 60,
-      PAD_Y = 80;
-    const adj: Record<string, string[]> = {};
-    const inDeg: Record<string, number> = {};
-    nodes.forEach((n) => {
-      adj[n.id] = [];
-      inDeg[n.id] = 0;
-    });
-    edges.forEach((e) => {
-      if (adj[e.source]) adj[e.source].push(e.target);
-      inDeg[e.target] = (inDeg[e.target] || 0) + 1;
-    });
-
-    const layer: Record<string, number> = {};
-    const queue = nodes.filter((n) => inDeg[n.id] === 0).map((n) => n.id);
-    queue.forEach((id) => {
-      layer[id] = 0;
-    });
-
-    while (queue.length > 0) {
-      const id = queue.shift()!;
-      (adj[id] || []).forEach((tid) => {
-        const next = (layer[id] || 0) + 1;
-        if (layer[tid] === undefined || layer[tid] < next) layer[tid] = next;
-        if (--inDeg[tid] <= 0) queue.push(tid);
-      });
-    }
-
-    nodes.forEach((n) => {
-      if (layer[n.id] === undefined) layer[n.id] = 0;
-    });
-    const maxLayer = Math.max(0, ...nodes.map((n) => layer[n.id]));
-    const groups: string[][] = Array.from({ length: maxLayer + 1 }, () => []);
-    nodes.forEach((n) => groups[layer[n.id]].push(n.id));
-    const totalH = Math.max(...groups.map((g) => g.length)) * ROW_H;
-
-    const updated = nodes.map((n) => {
-      const l = layer[n.id];
-      const group = groups[l];
-      const idx = group.indexOf(n.id);
-      const startY = PAD_Y + (totalH - group.length * ROW_H) / 2;
-      return {
-        ...n,
-        position: { x: PAD_X + l * COL_W, y: startY + idx * ROW_H },
-      };
-    });
-
-    get().takeSnapshot();
-    set({ nodes: updated });
+    const version: WorkflowVersion = {
+      id: `v-${Date.now()}`,
+      label: label ?? `Snapshot ${new Date().toLocaleString()}`,
+      timestamp: Date.now(),
+      nodes: JSON.parse(JSON.stringify(nodes)),
+      edges: JSON.parse(JSON.stringify(edges)),
+    };
+    const versions = [version, ...readVersions()].slice(0, 30);
+    writeVersions(versions);
+    set({ versions });
   },
+
+  restoreVersion: (id) => {
+    const version = get().versions.find((v) => v.id === id);
+    if (!version) return;
+    get().takeSnapshot();
+    set({ nodes: version.nodes, edges: version.edges });
+  },
+
+  deleteVersion: (id) => {
+    const versions = get().versions.filter((v) => v.id !== id);
+    writeVersions(versions);
+    set({ versions });
+  },
+
+  // ── Validation ────────────────────────────────────────────────────────────
+  validationErrors: {},
+
+  runValidation: () => {
+    const { nodes } = get();
+    const { errors } = validateGraphCredentials(nodes);
+    set({ validationErrors: errors });
+    set({
+      nodes: nodes.map((n) => ({
+        ...n,
+        data: { ...n.data, validationErrors: errors[n.id] ?? [] },
+      })),
+    });
+  },
+
+  // ── Execution ─────────────────────────────────────────────────────────────
+  currentRun: null,
+  executionHistory: [],
+
+  setCurrentRun: (run) => set({ currentRun: run }),
+
+  updateRunResult: (nodeId, state) => {
+    set({
+      nodes: get().nodes.map((n) =>
+        n.id === nodeId ? { ...n, data: { ...n.data, executionState: state } } : n
+      ),
+    });
+  },
+
+  addExecutionRun: (run) => {
+    set({ executionHistory: [run, ...get().executionHistory].slice(0, 50) });
+  },
+
+  clearExecution: () => {
+    set({
+      currentRun: null,
+      nodes: get().nodes.map((n) => ({ ...n, data: { ...n.data, executionState: undefined, executionLog: undefined, executionDuration: undefined, tokenUsage: undefined } })),
+    });
+  },
+
+  // ── UI State ──────────────────────────────────────────────────────────────
+  selectedNodeId: null,
+  rightPanelMode: "chat",
+  showIntentOrchestrator: false,
+  showExecutionPanel: false,
+  showExportModal: false,
+  showVersionHistory: false,
+  showPricingModal: false,
+  pricingTab: "plans",
+
+  setSelectedNode: (nodeId) => {
+    set({ selectedNodeId: nodeId, rightPanelMode: nodeId ? "node-config" : "chat" });
+  },
+
+  setRightPanelMode: (mode) => set({ rightPanelMode: mode }),
+  setShowIntentOrchestrator: (v) => set({ showIntentOrchestrator: v }),
+  setShowExecutionPanel: (v) => set({ showExecutionPanel: v }),
+  setShowExportModal: (v) => set({ showExportModal: v }),
+  setShowVersionHistory: (v) => set({ showVersionHistory: v }),
+  setShowPricingModal: (v, tab) => set({ showPricingModal: v, ...(tab ? { pricingTab: tab } : {}) }),
 }));
 
-export { makeEdge };
+export type { UserPlan, PlanTier, ExportProjectType };
