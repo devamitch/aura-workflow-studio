@@ -1962,6 +1962,8 @@ body[data-theme="light"] .app-header {
   padding-right: 16px;
   border-right: 1px solid var(--border-subtle);
   flex-shrink: 0;
+  cursor: pointer;
+  text-decoration: none;
 }
 
 .header-logo-mark {
@@ -7976,4 +7978,240 @@ body[data-theme="light"] .toast-card {
   box-shadow:
     0 12px 40px rgba(0, 0, 0, 0.15),
     0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.header-mobile-menu-btn {
+  display: none;
+}
+
+.header-mobile-menu {
+  display: none;
+}
+
+@media (max-width: 1024px) {
+  .settings-layout {
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .settings-sidebar {
+    width: 100%;
+    max-width: none;
+    border-right: none;
+    border-bottom: 1px solid var(--border-subtle);
+    padding-bottom: 16px;
+  }
+
+  .settings-nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 768px) {
+  .header-actions {
+    display: none;
+  }
+
+  .header-mobile-menu-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    color: var(--text-900);
+    cursor: pointer;
+  }
+
+  .header-mobile-menu {
+    display: block;
+    position: absolute;
+    top: 52px;
+    left: 0;
+    right: 0;
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border-subtle);
+    z-index: 200;
+    box-shadow: var(--shadow-md);
+  }
+
+  .header-mobile-menu-inner {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .header-user-name {
+    display: none;
+  }
+
+  .settings-shell {
+    padding: 16px;
+  }
+
+  .settings-header-main {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .settings-header-metrics {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .settings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-panel--wide {
+    grid-column: span 1;
+  }
+
+  .canvas-area {
+    overflow: auto;
+  }
+
+  .react-flow__node {
+    transform: scale(0.8);
+  }
+
+  .left-palette {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 80vw;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease-in-out;
+    z-index: 300;
+  }
+
+  .left-palette.open {
+    transform: translateX(0);
+    box-shadow: 6px 0 50px rgba(0, 0, 0, 0.5);
+  }
+
+  .left-palette-backdrop {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 299;
+  }
+
+  .left-palette.open + .left-palette-backdrop {
+    display: block;
+  }
+
+  .modal-card,
+  .modal-panel {
+    width: 90vw;
+    padding: 24px;
+  }
+
+  .right-panel {
+    position: fixed;
+    top: 52px;
+    right: 0;
+    bottom: 0;
+    width: 80vw;
+    transform: translateX(100%);
+    transition: transform 0.3s ease-in-out;
+    z-index: 200;
+  }
+
+  .right-panel.open {
+    transform: translateX(0);
+    box-shadow: -6px 0 50px rgba(0, 0, 0, 0.5);
+  }
+
+  .node-sidebar {
+    padding: 16px;
+  }
+
+  .ns-cred-input-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .bottom-bar {
+    padding: 4px;
+  }
+
+  .bottom-bar-btn {
+    width: 36px;
+    height: 36px;
+  }
+
+  .draggable-node {
+    padding: 10px;
+  }
+
+  .pipeline-node {
+    min-width: 200px;
+  }
+}
+
+.right-panel-open-btn {
+  display: flex;
+  /* display: none; */
+
+  align-items: center;
+  justify-content: center;
+  position: fixed;
+  top: 52px;
+  right: 0;
+  width: 42px;
+  height: 42px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-mid);
+  border-right: none;
+  border-top-left-radius: 50%;
+  border-bottom-left-radius: 50%;
+  color: var(--text-400);
+  cursor: pointer;
+  z-index: 199;
+}
+
+.right-panel-open-btn.hidden {
+  display: none;
+}
+
+@media (max-width: 480px) {
+  .settings-header-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .settings-segment {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .modal-card,
+  .modal-panel {
+    padding: 16px;
+  }
+
+  .modal-header {
+    margin-bottom: 16px;
+  }
+
+  .bottom-bar {
+    padding: 2px;
+  }
+
+  .bottom-bar-btn {
+    width: 32px;
+    height: 32px;
+  }
 }

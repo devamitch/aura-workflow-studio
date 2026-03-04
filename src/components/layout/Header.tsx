@@ -8,6 +8,7 @@ import {
   GitBranch,
   LayoutDashboard,
   LogOut,
+  Menu,
   Moon,
   PlayCircle,
   Save,
@@ -18,14 +19,18 @@ import {
   Zap,
 } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { shallow } from "zustand/shallow";
 import { AUTH_ME_QUERY_KEY } from "../../hooks/useAuthMeSync";
 import { useStore } from "../../store";
 import { WorkflowsModal } from "../sidebar/WorkflowsModal";
 import { PricingModal } from "../ui/PricingModal";
 
-export const Header: React.FC = ({ showMenu }: { showMenu?: boolean }) => {
+export const Header: React.FC<{
+  showMenu?: boolean;
+  toolbarOpen?: boolean;
+  setToolbarOpen?: (open: boolean) => void;
+}> = ({ showMenu, toolbarOpen, setToolbarOpen }) => {
   const [showWorkflowsModal, setShowWorkflowsModal] = useState(false);
   const [savePrompt, setSavePrompt] = useState(false);
   const [saveName, setSaveName] = useState("");
@@ -156,8 +161,14 @@ export const Header: React.FC = ({ showMenu }: { showMenu?: boolean }) => {
   return (
     <>
       <header className="app-header">
+        <button
+          className="header-mobile-menu-btn"
+          onClick={() => setToolbarOpen?.(!toolbarOpen)}
+        >
+          <Menu size={20} />
+        </button>
         {/* Brand */}
-        <div className="header-brand">
+        <Link to="/" className="header-brand">
           <div className="header-logo-mark">
             <img
               src="/app-icon.png"
@@ -174,7 +185,7 @@ export const Header: React.FC = ({ showMenu }: { showMenu?: boolean }) => {
             Aura <span>Studio</span>
           </span>
           <span className="header-badge">v2</span>
-        </div>
+        </Link>
 
         {/* Center actions */}
         {showMenu ? (

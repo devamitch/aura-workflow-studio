@@ -49,6 +49,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 const App: React.FC = () => {
   useAuthMeSync();
   const [chatOpen, setChatOpen] = useState(false);
+  const [toolbarOpen, setToolbarOpen] = useState(false);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const {
     theme,
@@ -154,12 +155,22 @@ const App: React.FC = () => {
   }) => (
     <ReactFlowProvider>
       <div className="app-shell">
-        <Header showMenu={showToolBar} />
+        <Header
+          showMenu={showToolBar}
+          toolbarOpen={toolbarOpen}
+          setToolbarOpen={setToolbarOpen}
+        />
         <div className="app-body">
           {showToolBar && (
-            <aside className="left-palette">
-              <PipelineToolbar />
-            </aside>
+            <>
+              <aside className={`left-palette ${toolbarOpen ? "open" : ""}`}>
+                <PipelineToolbar />
+              </aside>
+              <div
+                className="left-palette-backdrop"
+                onClick={() => setToolbarOpen(false)}
+              />
+            </>
           )}
           <main
             className={`canvas-area${showBottomBar ? "" : " canvas-area--settings"}`}
@@ -172,7 +183,11 @@ const App: React.FC = () => {
               />
             )}
           </main>
-          <RightChatPanel open={chatOpen} onClose={() => setChatOpen(false)} />
+          <RightChatPanel
+            open={chatOpen}
+            onClose={() => setChatOpen(false)}
+            onOpen={() => setChatOpen(true)}
+          />
         </div>
       </div>
 
