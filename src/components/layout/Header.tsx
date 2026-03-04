@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ChevronDown,
+  ChevronRightSquare,
   Crown,
   Download,
   FilePlus,
@@ -8,7 +9,6 @@ import {
   GitBranch,
   LayoutDashboard,
   LogOut,
-  Menu,
   Moon,
   PlayCircle,
   Save,
@@ -165,7 +165,7 @@ export const Header: React.FC<{
           className="header-mobile-menu-btn"
           onClick={() => setToolbarOpen?.(!toolbarOpen)}
         >
-          <Menu size={20} />
+          <ChevronRightSquare size={16} />
         </button>
         {/* Brand */}
         <Link to="/" className="header-brand">

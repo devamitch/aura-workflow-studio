@@ -8015,12 +8015,23 @@ body[data-theme="light"] .toast-card {
 
   .header-mobile-menu-btn {
     display: flex;
+    /* display: none; */
+
     align-items: center;
     justify-content: center;
-    background: transparent;
-    border: none;
-    color: var(--text-900);
+    position: fixed;
+    top: 52px;
+    left: 0;
+    width: 42px;
+    height: 42px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-mid);
+    border-right: none;
+    border-top-right-radius: 50%;
+    border-bottom-right-radius: 50%;
+    color: var(--text-400);
     cursor: pointer;
+    z-index: 100;
   }
 
   .header-mobile-menu {
