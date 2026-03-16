@@ -1,19 +1,15 @@
 import {
-  Loader2,
   Maximize,
   MessageSquare,
-  Play,
   Redo2,
   Undo2,
   ZoomIn,
   ZoomOut,
+  Zap,
 } from "lucide-react";
-import React, { useState } from "react";
+import React from "react";
 import { useReactFlow } from "reactflow";
-import { getApiBaseUrl } from "../../lib/runtime-config";
 import { useStore } from "../../store";
-import type { ParseResponse } from "../../types";
-import { AlertModal } from "./AlertModal";
 
 interface Props {
   onToggleChat: () => void;
@@ -21,35 +17,13 @@ interface Props {
 }
 
 export const IntegratedBottomBar: React.FC<Props> = ({ onToggleChat, chatOpen }) => {
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<ParseResponse | null>(null);
-
-  const nodes = useStore((s) => s.nodes);
-  const edges = useStore((s) => s.edges);
   const undo = useStore((s) => s.undo);
   const redo = useStore((s) => s.redo);
   const hasPast = useStore((s) => s.pastNodes.length > 0);
   const hasFuture = useStore((s) => s.futureNodes.length > 0);
+  const setShowExecutionPanel = useStore((s) => s.setShowExecutionPanel);
 
   const { zoomIn, zoomOut, fitView } = useReactFlow();
-
-  const handleRun = async () => {
-    if (loading) return;
-    setLoading(true);
-    try {
-      const response = await fetch(`${getApiBaseUrl()}/pipelines/parse`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nodes, edges }),
-      });
-      if (!response.ok) throw new Error(`Server error: ${response.status}`);
-      setResult(await response.json());
-    } catch {
-      alert("Failed to connect to backend.");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <>
@@ -91,18 +65,12 @@ export const IntegratedBottomBar: React.FC<Props> = ({ onToggleChat, chatOpen })
 
         {/* Run */}
         <div className="bottom-bar-group ml-auto">
-          <button className="bottom-bar-run-btn" onClick={handleRun} disabled={loading}>
-            {loading ? (
-              <Loader2 size={15} style={{ animation: "spin 0.7s linear infinite" }} />
-            ) : (
-              <Play size={14} fill="currentColor" />
-            )}
-            <span>{loading ? "Running…" : "Run Pipeline"}</span>
+          <button className="bottom-bar-run-btn" onClick={() => setShowExecutionPanel(true)}>
+            <Zap size={14} fill="currentColor" />
+            <span>Run Pipeline</span>
           </button>
         </div>
       </div>
-
-      {result && <AlertModal data={result} onClose={() => setResult(null)} />}
     </>
   );
 };

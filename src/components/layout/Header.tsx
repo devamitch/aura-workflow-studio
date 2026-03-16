@@ -168,7 +168,7 @@ export const Header: React.FC<{
           <ChevronRightSquare size={16} />
         </button>
         {/* Brand */}
-        <Link to="/" className="header-brand">
+        <Link to="/app" className="header-brand">
           <div className="header-logo-mark">
             <img
               src="/app-icon.png"

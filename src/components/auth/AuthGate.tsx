@@ -175,7 +175,7 @@ export const AuthGate: React.FC = () => {
   };
 
   if (!isGoogleConfigured || (user && !loading)) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/app" replace />;
   }
 
   if (loading) {

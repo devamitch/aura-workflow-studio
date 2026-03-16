@@ -18,6 +18,9 @@ import { PipelineToolbar } from "./components/sidebar/Toolbar";
 import { IntegratedBottomBar } from "./components/ui/IntegratedBottomBar";
 import { KeyboardHelp } from "./components/ui/KeyboardHelp";
 import { Toaster } from "./components/ui/Toaster";
+import { LandingPage } from "./components/landing/LandingPage";
+import { PrivacyPage } from "./components/landing/PrivacyPage";
+import { TermsPage } from "./components/landing/TermsPage";
 import { useAuthMeSync } from "./hooks/useAuthMeSync";
 import { GOOGLE_CLIENT_ID, isGoogleConfigured } from "./lib/google-auth";
 import { useStore } from "./store";
@@ -207,6 +210,7 @@ const App: React.FC = () => {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<AuthGate />} />
+          <Route path="/" element={<LandingPage />} />
           <Route
             path="/settings"
             element={
@@ -218,7 +222,7 @@ const App: React.FC = () => {
             }
           />
           <Route
-            path="/"
+            path="/app"
             element={
               <ProtectedRoute>
                 <AppShell showBottomBar showToolBar>
@@ -227,6 +231,8 @@ const App: React.FC = () => {
               </ProtectedRoute>
             }
           />
+          <Route path="/privacy" element={<PrivacyPage />} />
+          <Route path="/terms" element={<TermsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
