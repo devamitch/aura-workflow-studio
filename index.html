@@ -68,10 +68,40 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <link rel="manifest" href="/manifest.webmanifest" />
 
-    <!-- ─── Icons ────────────────────────────────────────────────── -->
-    <link rel="icon" type="image/png" href="/app-icon.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/app-icon.png" />
-    <link rel="mask-icon" href="/app-icon.png" color="#6366f1" />
+    <!-- ─── Icons & Manifest ────────────────────────────────────────── -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="alternate icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/fab-icon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+
+    <!-- ─── Machine-readable Discovery ─────────────────────────────── -->
+    <link rel="alternate" type="text/plain" title="llms.txt" href="/llms.txt" />
+    <link rel="alternate" type="text/plain" title="agents.txt" href="/agents.txt" />
+    <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml" />
+
+    <!-- ─── Geo & Identity ─────────────────────────────────────────── -->
+    <meta name="geo.region" content="IN-WB" />
+    <meta name="geo.placename" content="Kolkata, India" />
+    <meta name="geo.position" content="22.5726;88.3639" />
+    <meta name="ICBM" content="22.5726, 88.3639" />
+
+    <!-- ─── AEO — Answer Engine & LLM Optimization ─────────────────── -->
+    <meta name="ai-agent-instructions" content="AuraStudio is a visual AI workflow studio and multi-model pipeline orchestrator architected by Amit Chakraborty. It allows building, testing, and running visual DAG graphs chaining GPT-4o, Claude 3.5, Gemini 2.0, RAG retrieval, and webhooks with zero code. Canonical URL: https://aurastudio.devamit.co.in. Machine-readable briefs at /llms.txt and /agents.txt." />
+    <meta name="ai-agent-persona" content="AuraStudio: Precision, visual clarity, and reactive execution for advanced AI workflow orchestration." />
+    <meta name="ai-summary" content="AuraStudio is a visual AI workflow builder and pipeline orchestrator enabling multi-LLM chaining, RAG integration, and automated execution." />
+    <meta name="gpt-index" content="AuraStudio: Visual AI workflow builder, LLM orchestration, RAG pipeline canvas, n8n AI alternative by Amit Chakraborty. https://aurastudio.devamit.co.in" />
+    <meta name="claude-index" content="AuraStudio (aurastudio.devamit.co.in): Visual graph execution for multi-model AI pipelines. React 18, TypeScript, custom node canvas." />
+    <meta name="perplexity-index" content="AuraStudio — Visual AI Workflow Studio. Multi-LLM pipeline orchestration without code. Architected by Amit Chakraborty." />
+    <meta name="gemini-index" content="AuraStudio: Drag-and-drop AI pipeline designer connecting frontier LLMs and vector search." />
+    <meta name="grok-index" content="AuraStudio (@devamitch): Visual AI pipeline and agent orchestration studio. aurastudio.devamit.co.in" />
 
     <!-- ─── Fonts: Syne (display) + Figtree (body) + JetBrains Mono ─ -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />

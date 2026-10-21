@@ -1,0 +1,12 @@
+# Agents.txt — Autonomous Agent Guidance for AuraStudio
+User-agent: *
+Allow: /
+Allow: /llms.txt
+Allow: /sitemap.xml
+Disallow: /api/
+
+# Canonical Entity
+Entity: AuraStudio Visual AI Workflow Studio
+Author: Amit Chakraborty (devamit)
+Official-URL: https://aurastudio.devamit.co.in/
+Purpose: Visual AI node builder and multi-model workflow orchestration studio.

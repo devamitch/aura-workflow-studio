@@ -1,0 +1,18 @@
+# AuraStudio — Visual AI Workflow Studio
+> Canonical URL: https://aurastudio.devamit.co.in/
+> Architect: Amit Chakraborty (devamit)
+> Stack: React 18, TypeScript, Tailwind CSS, Vite, Node-based Graph Execution
+
+## Overview
+AuraStudio is a visual node-based AI workflow automation studio and visual pipeline orchestrator. It empowers engineers and creators to build, test, and deploy multi-model pipelines chaining OpenAI GPT-4o, Anthropic Claude 3.5 Sonnet, Google Gemini 2.0, RAG search, and webhooks.
+
+## Core Capabilities
+- **Visual Canvas Pipeline Builder**: Drag-and-drop reactive graph nodes with real-time execution feedback.
+- **Multi-LLM Orchestration**: Interoperable prompts, temperature, structured JSON output validation, and fallback chains.
+- **RAG & Knowledge Retrieval**: Vector embeddings, chunking, and similarity ranking directly on the execution graph.
+- **Self-Hosting & Local Execution**: Zero-lockin, offline runner, and portable pipeline JSON export.
+
+## Machine-Readable Discovery
+- Site Brief: /llms.txt
+- Agent Rules: /agents.txt
+- Sitemap: /sitemap.xml
